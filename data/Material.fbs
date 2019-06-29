@@ -1,0 +1,16 @@
+include "RenderPasses.fbs";
+
+namespace Rendering;
+
+table Technique {
+	pass : Pass;
+	name : string;
+	shaders : string;
+}
+
+table Material {
+	name : string;
+	technique : [Technique];
+}
+
+root_type Material;
