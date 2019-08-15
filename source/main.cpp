@@ -10,48 +10,20 @@
 #include <GL/glew.h>
 
 #include "CodeGenerator.h"
+#include "ShaderCodeGenerator.h"
 
 // HDF generated classes
 #include "SimpleData.h"
 
-// Flatbuffers generated classes
-#include "RenderDefinitions_generated.h"
 
-#define ArrayLength(array) ( sizeof(array)/sizeof((array)[0]) )
-
-// Utility method
-static char* ReadEntireFileIntoMemory( const char* fileName, size_t* size ) {
-    char *text = 0;
-
-    FILE *file = fopen( fileName, "rb" );
-
-    if ( file ) {
-
-        fseek( file, 0, SEEK_END );
-        size_t filesize = ftell( file );
-        fseek( file, 0, SEEK_SET );
-
-        text = (char *)malloc( filesize + 1 );
-        size_t result = fread( text, filesize, 1, file );
-        text[filesize] = 0;
-
-        if ( size )
-            *size = filesize;
-
-        fclose( file );
-    }
-
-    return(text);
-}
-
-static void ReflectUI( const Parser& parser ) {
+static void ReflectUI( const hdf::Parser& parser ) {
     ImGui::Begin( "Enums" );
 
     char name_buffer[256], type_name_buffer[256];
 
     for ( uint32_t i = 0; i < parser.types_count; ++i ) {
-        const ast::Type& type = parser.types[i];
-        if ( type.type == ast::Type::Types_Enum && type.names.size() ) {
+        const hdf::Type& type = parser.types[i];
+        if ( type.type == hdf::Type::Types_Enum && type.names.size() ) {
             
             copy( type.name, name_buffer, 256 );
 
@@ -72,15 +44,15 @@ static void ReflectUI( const Parser& parser ) {
 
     ImGui::Begin( "Structs" );
     for ( uint32_t i = 0; i < parser.types_count; ++i ) {
-        const ast::Type& type = parser.types[i];
-        if ( type.type == ast::Type::Types_Struct && type.names.size() ) {
+        const hdf::Type& type = parser.types[i];
+        if ( type.type == hdf::Type::Types_Struct && type.names.size() ) {
 
             copy( type.name, name_buffer, 256 );
 
             if ( ImGui::TreeNode( name_buffer ) ) {
                 for ( uint32_t v = 0; v < type.names.size(); ++v ) {
                     const StringRef& member_name = type.names[v];
-                    const ast::Type* member_type = type.types[v];
+                    const hdf::Type* member_type = type.types[v];
 
                     copy( member_name, name_buffer, 256 );
                     copy( member_type->name, type_name_buffer, 256 );
@@ -136,23 +108,41 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL2_InitForOpenGL( window, gl_context );
     ImGui_ImplOpenGL3_Init( glsl_version );
 
-    // Code generation part
+    // Lexer used by all code generators.
     Lexer lexer;
+
+    ////////
+    // 1. HDF (Hydra Data Format) parsing and code generation
+    
     char* text = ReadEntireFileIntoMemory( "..\\data\\SimpleData.hdf", nullptr );
     initLexer( &lexer, (char*)text );
 
-    Parser parser;
-    initParser( &parser, &lexer, 1024 );
-    generateAST( &parser );
+    hdf::Parser parser;
+    hdf::initParser( &parser, &lexer, 1024 );
+    hdf::generateAST( &parser );
 
-    CodeGenerator code_generator;
-    initCodeGenerator( &code_generator, &parser, 6000 );
+    hdf::CodeGenerator code_generator;
+    hdf::initCodeGenerator( &code_generator, &parser, 6000 );
     code_generator.generate_imgui = true;
-    generateCode( &code_generator, "..\\source\\SimpleData.h" );
+    hdf::generateCode( &code_generator, "..\\source\\SimpleData.h" );
 
     // Generated class
     RenderTarget rt = {};
     RenderPass rp = {};
+
+    ////////
+    // 2. HFX (Hydra Effects)
+    text = ReadEntireFileIntoMemory( "..\\data\\SimpleFullscreen.hfx", nullptr );
+    initLexer( &lexer, (char*)text );
+
+    hfx::Parser effect_parser;
+    hfx::initParser( &effect_parser, &lexer );
+    hfx::generateAST( &effect_parser );
+
+    hfx::CodeGenerator hfx_code_generator;
+    hfx::initCodeGenerator( &hfx_code_generator, &effect_parser, 4096 );
+    hfx::generateShaderPermutations( &hfx_code_generator, "..\\data\\" );
+
 
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4( 0.45f, 0.05f, 0.00f, 1.00f );
