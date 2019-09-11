@@ -1,4 +1,46 @@
 shader SimpleFullscreen {
+
+    // For the artist
+    properties {
+
+        // Using Unity ShaderLab syntax:
+        // AORemapMin0("AORemapMin0", Range(0.0, 1.0)) = 0.0
+        scale("Scale", Float) = 32.0
+        modulo("Modulo", Float) = 2.0
+    }
+
+    // For the developer
+    layout {
+        list LocalCompute {
+            cbuffer LocalConstants local_constants;
+
+            texture2Drw rgba8 destination_texture;
+        }
+
+        list Local {
+            texture2D input_texture;
+        }
+    }
+    
+    glsl ComputeTest {
+
+        #pragma include "Platform.h"
+
+        layout(rgba8, binding=0) writeonly uniform image2D destination_texture;
+
+        layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+        void main() {
+
+            ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+            // Returns a checkerboard pattern:
+            vec2 scaled_pos = ceil(gl_GlobalInvocationID.xy / local_constants.scale);
+            float color = mod(scaled_pos.x + scaled_pos.y, local_constants.modulo);
+            imageStore(destination_texture, pos, vec4(color.r, 1, 0, 1));
+        }
+    }
+
     glsl ToScreen {
 
         #pragma include "Platform.h"
@@ -31,31 +73,16 @@ shader SimpleFullscreen {
         #endif // FRAGMENT
     }
 
-    glsl ComputeTest {
-
-        #if defined COMPUTE
-
-        layout(rgba8, binding=0) writeonly uniform image2D destination_texture;
-
-        layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-
-        void main() {
-
-            ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-
-            // Returns a checkerboard pattern:
-            vec2 scaled_pos = ceil(gl_GlobalInvocationID.xy / 32.0f);
-            float color = mod(scaled_pos.x + scaled_pos.y, 2.);
-            imageStore(destination_texture, pos, vec4(color.rrr, 1));
-        }
-        #endif // COMPUTE
-    }
-
     pass FillTexture {
+        // dispatch = 32, 32, 1
+        // stage = compute
+        resources = LocalCompute
         compute = ComputeTest
     }
 
     pass ToScreen {
+        // stage = fullscreen
+        resources = Local
         vertex = ToScreen
         fragment = ToScreen
     }

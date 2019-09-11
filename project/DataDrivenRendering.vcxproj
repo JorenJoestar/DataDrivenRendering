@@ -89,6 +89,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\source\hydra_graphics.cpp" />
+    <ClCompile Include="..\source\hydra_lib.cpp" />
     <ClCompile Include="..\source\imgui\imgui.cpp" />
     <ClCompile Include="..\source\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\source\imgui\imgui_draw.cpp" />
@@ -99,6 +101,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\source\CodeGenerator.h" />
+    <ClInclude Include="..\source\hydra_graphics.h" />
+    <ClInclude Include="..\source\hydra_lib.h" />
     <ClInclude Include="..\source\Lexer.h" />
     <ClInclude Include="..\source\ShaderCodeGenerator.h" />
   </ItemGroup>

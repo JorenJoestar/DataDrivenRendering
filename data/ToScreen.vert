@@ -1,6 +1,15 @@
 #version 430
 		#define VERTEX
 
+		layout (std140, binding=7) uniform LocalConstants {
+
+			float					scale;
+			float					modulo;
+			float					pad_tail[2];
+
+		} local_constants;
+
+
 		#pragma include "Platform.h"
 
         #if defined VERTEX
@@ -29,6 +38,4 @@
             outColor = vec4(color, 1);
         }
         #endif // FRAGMENT
-    }
-
     
