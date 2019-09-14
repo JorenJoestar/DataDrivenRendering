@@ -7,7 +7,7 @@
 namespace hfx {
 
     typedef hydra::graphics::ShaderStage::Enum Stage;
-    typedef hydra::graphics::ResourceSetLayoutCreation::Binding ResourceBinding;
+    typedef hydra::graphics::ResourceListLayoutCreation::Binding ResourceBinding;
 
     //
     //
@@ -78,10 +78,10 @@ namespace hfx {
     //
     struct Shader {
 
-        StringRef                   name;
+        StringRef                       name;
 
-        std::vector<Pass*>          passes;
-        std::vector<Property*>      properties;
+        std::vector<Pass*>              passes;
+        std::vector<Property*>          properties;
         std::vector<const ResourceList*> resource_lists;    // All declared lists
     }; // struct Shader
 
@@ -179,6 +179,12 @@ namespace hfx {
 
         parser->shader.name.length = 0;
         parser->shader.name.text = nullptr;
+        parser->shader.passes.clear();
+        parser->shader.properties.clear();
+        parser->shader.resource_lists.clear();
+
+        parser->code_fragments.clear();
+        parser->passes.clear();
     }
 
     void generateAST( Parser* parser ) {
@@ -1022,11 +1028,11 @@ namespace hfx {
             char* include_code = ReadEntireFileIntoMemory( filename_buffer.data, nullptr );
 
             code_buffer.append( include_code );
-            code_buffer.append( "\r\n" );
+            code_buffer.append( "\n\n" );
         }
 
         // Add the per stage define.
-        code_buffer.append( "\t\t" );
+        code_buffer.append( "\n\t\t" );
         code_buffer.append( s_shader_stage_defines[stage] );
 
         // Append local constants
@@ -1049,6 +1055,8 @@ namespace hfx {
         StringBuffer& filename_buffer = code_generator->string_buffers[0];
         filename_buffer.clear();
         filename_buffer.append( path );
+        filename_buffer.append( code_generator->parser->shader.name );
+        filename_buffer.append( "_" );
         filename_buffer.append( stage.code->name );
         filename_buffer.append( s_shader_file_extension[stage.stage] );
         fopen_s( &output_file, filename_buffer.data, "wb" );
@@ -1092,9 +1100,9 @@ namespace hfx {
         using namespace hydra::graphics;
 
         // Add the local constant buffer obtained from all the properties in the layout.
-        hydra::graphics::ResourceSetLayoutCreation::Binding binding = { hydra::graphics::ResourceType::Constants, 0, 1, "LocalConstants" };
-        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding) );
-        pass_offset += sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding );
+        hydra::graphics::ResourceListLayoutCreation::Binding binding = { hydra::graphics::ResourceType::Constants, 0, 1, "LocalConstants" };
+        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceListLayoutCreation::Binding) );
+        pass_offset += sizeof( hydra::graphics::ResourceListLayoutCreation::Binding );
 
         for ( size_t s = 0; s < pass.shader_stages.size(); ++s ) {
             const Pass::ShaderStage shader_stage = pass.shader_stages[s];
@@ -1108,8 +1116,8 @@ namespace hfx {
                         copy( resource.name, binding.name, 32 );
                         binding.type = hydra::graphics::ResourceType::Texture;
 
-                        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding ) );
-                        pass_offset += sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding );
+                        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceListLayoutCreation::Binding ) );
+                        pass_offset += sizeof( hydra::graphics::ResourceListLayoutCreation::Binding );
                         break;
                     }
 
@@ -1118,8 +1126,8 @@ namespace hfx {
                         copy( resource.name, binding.name, 32 );
                         binding.type = hydra::graphics::ResourceType::TextureRW;
 
-                        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding ) );
-                        pass_offset += sizeof( hydra::graphics::ResourceSetLayoutCreation::Binding );
+                        pass_buffer.append( (void*)&binding, sizeof( hydra::graphics::ResourceListLayoutCreation::Binding ) );
+                        pass_offset += sizeof( hydra::graphics::ResourceListLayoutCreation::Binding );
                         break;
                     }
                 }
@@ -1224,6 +1232,7 @@ namespace hfx {
                 updateOffsetTable( &current_shader_offset, pass_header_size, shader_offset_buffer, code_buffer );
 
                 // Manually count resources for automatic layout.
+                // This needs to be done on a per pass level.
                 if ( automatic_layout ) {
                     for ( size_t p = 0; p < shader_stage.code->resources.size(); p++ ) {
                         const hfx::CodeFragment::Resource& resource = shader_stage.code->resources[p];
@@ -1239,21 +1248,20 @@ namespace hfx {
                         }
                     }
                 }
-                else {
-                    // Search the resource lists
-                    for ( size_t i = 0; i < pass.resource_lists.size(); i++ ) {
-                        total_resources += (uint32_t)pass.resource_lists[i]->resources.size();
-                    }
-                }
             }
 
             // Update pass offset to the resource list sub-section
             pass_offset += code_buffer.current_size + pass_header_size;
 
             // Add local constant buffer in the count only if automatic layout is needed.
-            // TODO: force this to true until implementation is done.
             if ( automatic_layout ) {
                 ++total_resources;
+            }
+            else {
+                // Otherwise search the resource lists that are per pass and non per shader stage.
+                for ( size_t i = 0; i < pass.resource_lists.size(); i++ ) {
+                    total_resources += (uint32_t)pass.resource_lists[i]->resources.size();
+                }
             }
             
             // Fill Pass Header

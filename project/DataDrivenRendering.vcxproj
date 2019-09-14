@@ -94,7 +94,6 @@
     <ClCompile Include="..\source\imgui\imgui.cpp" />
     <ClCompile Include="..\source\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\source\imgui\imgui_draw.cpp" />
-    <ClCompile Include="..\source\imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="..\source\imgui\imgui_impl_sdl.cpp" />
     <ClCompile Include="..\source\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\source\main.cpp" />
@@ -102,6 +101,7 @@
   <ItemGroup>
     <ClInclude Include="..\source\CodeGenerator.h" />
     <ClInclude Include="..\source\hydra_graphics.h" />
+    <ClInclude Include="..\source\hydra_imgui.h" />
     <ClInclude Include="..\source\hydra_lib.h" />
     <ClInclude Include="..\source\Lexer.h" />
     <ClInclude Include="..\source\ShaderCodeGenerator.h" />

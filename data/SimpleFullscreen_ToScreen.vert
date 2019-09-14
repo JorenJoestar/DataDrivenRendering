@@ -1,5 +1,8 @@
 #version 430
-		#define FRAGMENT
+
+
+
+		#define VERTEX
 
 		layout (std140, binding=7) uniform LocalConstants {
 

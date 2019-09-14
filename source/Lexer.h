@@ -222,6 +222,11 @@ void StringBuffer::append( void* memory, uint32_t size ) {
 }
 
 void StringBuffer::append( const StringBuffer& other_buffer ) {
+
+    if ( other_buffer.current_size == 0 ) {
+        return;
+    }
+
     if ( current_size + other_buffer.current_size >= buffer_size ) {
         return;
     }

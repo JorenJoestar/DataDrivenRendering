@@ -1,6 +1,6 @@
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
-#include "imgui_impl_opengl3.h"
+#include "hydra_imgui.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -105,8 +105,6 @@ struct Application {
 
     // hydra::gfx_device::ShaderEffect    shader_effect;
 
-    hydra::graphics::ShaderHandle   compute_shader;
-    hydra::graphics::ShaderHandle   fullscreen_color_shader;
     hydra::graphics::TextureHandle  render_target;
     hydra::graphics::BufferHandle   checker_constants;
 
@@ -208,18 +206,19 @@ void Application::init() {
 
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL( window, gl_context );
-    ImGui_ImplOpenGL3_Init();
 
     // Init the gfx_device device
     hydra::graphics::DeviceCreation device_creation = {};
     device_creation.window = window;
     gfx_device.init( device_creation );
+
+    hydra_Imgui_Init( gfx_device );
 }
 
 void Application::terminate() {
 
     // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
+    hydra_Imgui_Shutdown( gfx_device );
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
@@ -238,15 +237,13 @@ void Application::manual_init_graphics() {
     // - Compute shader
     Buffer compute_file_buffer;
     ReadFileIntoMemory( "..\\data\\ComputeTest.comp", "r", compute_file_buffer );
+    graphics::ShaderCreation first_compute = {};
     if ( compute_file_buffer.size() ) {
 
         graphics::ShaderCreation::Stage compute_stage = { graphics::ShaderStage::Compute, (const char*)compute_file_buffer.data() };
-        graphics::ShaderCreation first_compute = {};
         first_compute.stages = &compute_stage;
         first_compute.stages_count = 1;
         first_compute.name = "First Compute";
-
-        compute_shader = gfx_device.create_shader( first_compute );
     }
 
     // - Fullscreen color shader
@@ -254,16 +251,13 @@ void Application::manual_init_graphics() {
     ReadFileIntoMemory( "..\\data\\ToScreen.vert", "r", color_vert_buffer );
     ReadFileIntoMemory( "..\\data\\ToScreen.frag", "r", color_frag_buffer );
 
+    graphics::ShaderCreation first_shader = {};
     if ( color_vert_buffer.size() && color_frag_buffer.size() ) {
         graphics::ShaderCreation::Stage stages[] = { { graphics::ShaderStage::Vertex, (const char*)color_vert_buffer.data() },
-        { graphics::ShaderStage::Fragment, (const char*)color_frag_buffer.data() } };
-
-        graphics::ShaderCreation first_shader = {};
+                                                     { graphics::ShaderStage::Fragment, (const char*)color_frag_buffer.data() } };
         first_shader.stages = stages;
         first_shader.stages_count = 2;
         first_shader.name = "First Fullscreen";
-
-        fullscreen_color_shader = gfx_device.create_shader( first_shader );
     }
 
     // - Destination texture
@@ -288,40 +282,40 @@ void Application::manual_init_graphics() {
     // Resource layout
     // - Compute
 
-    const graphics::ResourceSetLayoutCreation::Binding compute_bindings[] = { { graphics::ResourceType::TextureRW, 0, 1, "destination_texture" }, { graphics::ResourceType::Constants, 0, 1, "LocalConstants" } };
-    graphics::ResourceSetLayoutCreation resource_layout_creation = { compute_bindings, 2 };
+    const graphics::ResourceListLayoutCreation::Binding compute_bindings[] = { { graphics::ResourceType::TextureRW, 0, 1, "destination_texture" }, { graphics::ResourceType::Constants, 0, 1, "LocalConstants" } };
+    graphics::ResourceListLayoutCreation resource_layout_creation = { compute_bindings, 2 };
 
-    graphics::ResourceSetLayoutHandle compute_resource_layout = gfx_device.create_resource_set_layout( resource_layout_creation );
+    graphics::ResourceListLayoutHandle compute_resource_layout = gfx_device.create_resource_list_layout( resource_layout_creation );
 
     // - Graphics
-    const graphics::ResourceSetLayoutCreation::Binding gfx_bindings[] = { { graphics::ResourceType::Texture, 0, 1, "input_texture" } };
-    graphics::ResourceSetLayoutCreation gfx_layout_creation = { gfx_bindings, 1 };
+    const graphics::ResourceListLayoutCreation::Binding gfx_bindings[] = { { graphics::ResourceType::Texture, 0, 1, "input_texture" } };
+    graphics::ResourceListLayoutCreation gfx_layout_creation = { gfx_bindings, 1 };
 
-    graphics::ResourceSetLayoutHandle gfx_resource_layout = gfx_device.create_resource_set_layout( gfx_layout_creation );
+    graphics::ResourceListLayoutHandle gfx_resource_layout = gfx_device.create_resource_list_layout( gfx_layout_creation );
 
     // Resource sets
     // - Compute
-    const graphics::ResourceSetCreation::Resource compute_resources_handles[] = { render_target.handle, checker_constants.handle };
-    graphics::ResourceSetCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, 2 };
-    graphics::ResourceSetHandle compute_resources = gfx_device.create_resource_set( compute_resources_creation );
+    const graphics::ResourceListCreation::Resource compute_resources_handles[] = { render_target.handle, checker_constants.handle };
+    graphics::ResourceListCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, 2 };
+    graphics::ResourceListHandle compute_resources = gfx_device.create_resource_list( compute_resources_creation );
 
     // - Graphics
-    const graphics::ResourceSetCreation::Resource gfx_resources_handles[] = { render_target.handle };
-    graphics::ResourceSetCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, 1 };
+    const graphics::ResourceListCreation::Resource gfx_resources_handles[] = { render_target.handle };
+    graphics::ResourceListCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, 1 };
 
-    graphics::ResourceSetHandle gfx_resources = gfx_device.create_resource_set( gfx_resources_creation );
+    graphics::ResourceListHandle gfx_resources = gfx_device.create_resource_list( gfx_resources_creation );
 
     // Pipelines
 
     // - Compute pipeline
     graphics::PipelineCreation compute_pipeline = {};
-    compute_pipeline.shader_state = compute_shader;
+    compute_pipeline.shaders = &first_compute;
     compute_pipeline.resource_layout = compute_resource_layout;
     graphics::PipelineHandle first_compute_pipeline = gfx_device.create_pipeline( compute_pipeline );
 
     // - Graphics pipeline
     graphics::PipelineCreation graphics_pipeline = {};
-    graphics_pipeline.shader_state = fullscreen_color_shader;
+    graphics_pipeline.shaders = &first_shader;
     graphics_pipeline.resource_layout = gfx_resource_layout;
     graphics::PipelineHandle first_graphics_pipeline = gfx_device.create_pipeline( graphics_pipeline );
 
@@ -329,18 +323,18 @@ void Application::manual_init_graphics() {
     commands = gfx_device.get_command_buffer( graphics::QueueType::Graphics, 1024 );
 
     commands->bind_pipeline( first_compute_pipeline );
-    commands->bind_resource_set( compute_resources );
+    commands->bind_resource_list( compute_resources );
     commands->dispatch( first_rt.width / 32, first_rt.height / 32, 1 );
 
     commands->bind_pipeline( first_graphics_pipeline );
-    commands->bind_resource_set( gfx_resources );
+    commands->bind_resource_list( gfx_resources );
     commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer() );
     commands->draw( graphics::TopologyType::Triangle, 0, 3 );
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
-static void compile_shader_effect_pass( hydra::graphics::Device& device, char* hfx_file_memory, uint16_t pass_index, hydra::graphics::ShaderHandle& out_shader, hydra::graphics::ResourceSetLayoutHandle& out_resource_set_layout ) {
+static void compile_shader_effect_pass( hydra::graphics::Device& device, char* hfx_file_memory, uint16_t pass_index, hydra::graphics::ShaderCreation& out_shader, hydra::graphics::ResourceListLayoutHandle& out_resource_set_layout ) {
     using namespace hydra;
 
     // Create shader
@@ -353,20 +347,15 @@ static void compile_shader_effect_pass( hydra::graphics::Device& device, char* h
         hfx::getShaderCreation( shader_count, pass, i, &stages[i] );
     }
 
-    graphics::ShaderCreation first_shader = {};
-    first_shader.stages = stages;
-    first_shader.stages_count = shader_count;
-    first_shader.name = pass_header->name;
-
-    out_shader = device.create_shader( first_shader );
-
-    delete stages;
+    out_shader.stages = stages;
+    out_shader.stages_count = shader_count;
+    out_shader.name = pass_header->name;
 
     // Create Resource Set Layout
-    const hydra::graphics::ResourceSetLayoutCreation::Binding* bindings = (const hydra::graphics::ResourceSetLayoutCreation::Binding*)(pass + pass_header->resource_table_offset);
-    hydra::graphics::ResourceSetLayoutCreation resource_layout_creation = { bindings, pass_header->num_resources };
+    const hydra::graphics::ResourceListLayoutCreation::Binding* bindings = (const hydra::graphics::ResourceListLayoutCreation::Binding*)(pass + pass_header->resource_table_offset);
+    hydra::graphics::ResourceListLayoutCreation resource_layout_creation = { bindings, pass_header->num_resources };
 
-    out_resource_set_layout = device.create_resource_set_layout( resource_layout_creation );
+    out_resource_set_layout = device.create_resource_list_layout( resource_layout_creation );
 }
 
 void Application::load_shader_effect() {
@@ -376,11 +365,14 @@ void Application::load_shader_effect() {
     char* hfx_file_memory = ReadEntireFileIntoMemory( "..\\data\\SimpleFullscreen.bhfx", nullptr );
     hfx::ShaderEffectFile* hfx_file = (hfx::ShaderEffectFile*)hfx_file_memory;
 
-    graphics::ResourceSetLayoutHandle compute_resource_layout, gfx_resource_layout;
+    graphics::ResourceListLayoutHandle compute_resource_layout, gfx_resource_layout;
+
+    graphics::ShaderCreation compute_shader = {};
+    graphics::ShaderCreation fullscreen_shader = {};
 
     // Generate both shader states AND resource set layout!
     compile_shader_effect_pass( gfx_device, hfx_file_memory, 0, compute_shader, compute_resource_layout );
-    compile_shader_effect_pass( gfx_device, hfx_file_memory, 1, fullscreen_color_shader, gfx_resource_layout );
+    compile_shader_effect_pass( gfx_device, hfx_file_memory, 1, fullscreen_shader, gfx_resource_layout );
 
     // - Destination texture
     graphics::TextureCreation first_rt = {};
@@ -395,27 +387,28 @@ void Application::load_shader_effect() {
 
     // Resource sets
     // - Compute
-    const graphics::ResourceSetCreation::Resource compute_resources_handles[] = { local_constant_buffer.buffer.handle, render_target.handle };
-    graphics::ResourceSetCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, 2 };
-    graphics::ResourceSetHandle compute_resources = gfx_device.create_resource_set( compute_resources_creation );
+    const graphics::ResourceListCreation::Resource compute_resources_handles[] = { local_constant_buffer.buffer.handle, render_target.handle };
+    graphics::ResourceListCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, 2 };
+    graphics::ResourceListHandle compute_resources = gfx_device.create_resource_list( compute_resources_creation );
 
     // - Graphics
-    const graphics::ResourceSetCreation::Resource gfx_resources_handles[] = { render_target.handle };
-    graphics::ResourceSetCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, 2 };
+    const graphics::ResourceListCreation::Resource gfx_resources_handles[] = { render_target.handle };
+    graphics::ResourceListCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, 2 };
 
-    graphics::ResourceSetHandle gfx_resources = gfx_device.create_resource_set( gfx_resources_creation );
+    graphics::ResourceListHandle gfx_resources = gfx_device.create_resource_list( gfx_resources_creation );
 
     // Pipelines
 
     // - Compute pipeline
     graphics::PipelineCreation compute_pipeline = {};
-    compute_pipeline.shader_state = compute_shader;
+    compute_pipeline.compute = true;
+    compute_pipeline.shaders = &compute_shader;
     compute_pipeline.resource_layout = compute_resource_layout;
     graphics::PipelineHandle first_compute_pipeline = gfx_device.create_pipeline( compute_pipeline );
 
     // - Graphics pipeline
     graphics::PipelineCreation graphics_pipeline = {};
-    graphics_pipeline.shader_state = fullscreen_color_shader;
+    graphics_pipeline.shaders = &fullscreen_shader;
     graphics_pipeline.resource_layout = gfx_resource_layout;
     graphics::PipelineHandle first_graphics_pipeline = gfx_device.create_pipeline( graphics_pipeline );
 
@@ -423,11 +416,11 @@ void Application::load_shader_effect() {
     commands = gfx_device.get_command_buffer( graphics::QueueType::Graphics, 1024 );
 
     commands->bind_pipeline( first_compute_pipeline );
-    commands->bind_resource_set( compute_resources );
+    commands->bind_resource_list( compute_resources );
     commands->dispatch( first_rt.width / 32, first_rt.height / 32, 1 );
 
     commands->bind_pipeline( first_graphics_pipeline );
-    commands->bind_resource_set( gfx_resources );
+    commands->bind_resource_list( gfx_resources );
     commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer() );
     commands->draw( graphics::TopologyType::Triangle, 0, 3 );
 }
@@ -445,9 +438,9 @@ static void generate_hdf_classes( Lexer& lexer, hdf::Parser& parser, hdf::CodeGe
     hdf::generateCode( &code_generator, "..\\source\\SimpleData.h" );
 }
 
-static void generate_shader_permutation( Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer ) {
+static void generate_shader_permutation( const char* filename, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer ) {
 
-    char* text = ReadEntireFileIntoMemory( "..\\data\\SimpleFullscreen.hfx", nullptr );
+    char* text = ReadEntireFileIntoMemory( filename, nullptr );
     initLexer( &lexer, (char*)text, data_buffer );
 
     hfx::initParser( &effect_parser, &lexer );
@@ -455,6 +448,20 @@ static void generate_shader_permutation( Lexer& lexer, hfx::Parser& effect_parse
 
     hfx::initCodeGenerator( &hfx_code_generator, &effect_parser, 8000, 8 );
     hfx::generateShaderPermutations( &hfx_code_generator, "..\\data\\" );
+}
+
+//
+// Compile HFX to output filename from scratch
+//
+static void compile_hfx( const char* filename, const char* out_filename, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer ) {
+    char* text = ReadEntireFileIntoMemory( filename, nullptr );
+    initLexer( &lexer, (char*)text, data_buffer );
+
+    hfx::initParser( &effect_parser, &lexer );
+    hfx::generateAST( &effect_parser );
+
+    hfx::initCodeGenerator( &hfx_code_generator, &effect_parser, 8000, 8 );
+    hfx::compileShaderEffectFile( &hfx_code_generator, "..\\data\\", out_filename );
 }
 
 void Application::main_loop() {
@@ -492,7 +499,7 @@ void Application::main_loop() {
     hfx::Parser effect_parser;
     hfx::CodeGenerator hfx_code_generator;
 
-    generate_shader_permutation( lexer, effect_parser, hfx_code_generator, &data_buffer );
+    generate_shader_permutation( "..\\data\\SimpleFullscreen.hfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
 
     ////////
     // 3. HFX full usage
@@ -510,8 +517,15 @@ void Application::main_loop() {
     // 3.4 Generate constant buffer header file and use it.
     hfx::generateShaderResourceHeader( &hfx_code_generator, "..\\source\\" );
 
+    // 4. HFX ImGui Shader
+    generate_shader_permutation( "..\\data\\ImGui.hfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
+    compile_hfx( "..\\data\\ImGui.hfx", "ImGui.bhfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
+
+
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4( 0.45f, 0.05f, 0.00f, 1.00f );
+
+    hydra::graphics::CommandBuffer* ui_commands = gfx_device.get_command_buffer( hydra::graphics::QueueType::Graphics, 1024 );
 
     // Main loop
     bool done = false;
@@ -528,7 +542,7 @@ void Application::main_loop() {
         }
 
         // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
+        hydra_Imgui_NewFrame();
         ImGui_ImplSDL2_NewFrame( window );
         ImGui::NewFrame();
 
@@ -552,9 +566,12 @@ void Application::main_loop() {
         glClear( GL_COLOR_BUFFER_BIT );
 
         gfx_device.execute_command_buffer( commands );
+
+        hydra_Imgui_RenderDrawData( ImGui::GetDrawData(), gfx_device, *ui_commands );
+        gfx_device.execute_command_buffer( ui_commands );
+
         gfx_device.present();
 
-        ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
         SDL_GL_SwapWindow( window );
     }
 

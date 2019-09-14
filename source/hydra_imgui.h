@@ -1,0 +1,275 @@
+#pragma once
+
+
+#include "imgui.h"
+#include "hydra_graphics.h"
+#include "ShaderCodeGenerator.h"
+
+#include "Lexer.h"
+
+#include <GL/glew.h>    // Needs to be initialized with glewInit() in user's code
+
+// Hydra Graphics Data
+static hydra::graphics::TextureHandle g_font_texture;
+static hydra::graphics::PipelineHandle g_imgui_pipeline;
+static hydra::graphics::BufferHandle g_vb, g_ib;
+static hydra::graphics::BufferHandle g_ui_cb;
+static hydra::graphics::ResourceListHandle g_ui_resource_list;
+static size_t g_vb_size = 665536, g_ib_size = 665536;
+
+// Functions
+bool hydra_Imgui_Init( hydra::graphics::Device& graphics_device )
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.BackendRendererName = "Hydra_ImGui";
+
+    using namespace hydra::graphics;
+
+    // Load font texture atlas //////////////////////////////////////////////////
+    unsigned char* pixels;
+    int width, height;
+    io.Fonts->GetTexDataAsRGBA32( &pixels, &width, &height );   // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
+
+    TextureCreation texture_creation = { pixels, width, height, 1, 1, 0, TextureFormat::R8G8B8A8_UNORM, TextureType::Texture2D };
+    g_font_texture = graphics_device.create_texture( texture_creation );
+
+    // Store our identifier
+    io.Fonts->TexID = (ImTextureID)&g_font_texture;
+
+    // Create shader
+    char* hfx_file_memory = ReadEntireFileIntoMemory( "..\\data\\ImGui.bhfx", nullptr );
+    char* pass = hfx::getPassMemory( hfx_file_memory, 0 );
+    hfx::ShaderEffectFile::PassHeader* pass_header = (hfx::ShaderEffectFile::PassHeader*)pass;
+    uint32_t shader_count = pass_header->num_shader_chunks;
+    ShaderCreation::Stage* shader_stages = new ShaderCreation::Stage[shader_count];
+
+    for ( uint16_t i = 0; i < shader_count; i++ ) {
+        hfx::getShaderCreation( shader_count, pass, i, &shader_stages[i] );
+    }
+
+    ShaderCreation shader_creation = {};
+    shader_creation.name = "ImGui_Shader";
+    shader_creation.stages = shader_stages;
+    shader_creation.stages_count = shader_count;
+
+    const hydra::graphics::ResourceListLayoutCreation::Binding* bindings = (const hydra::graphics::ResourceListLayoutCreation::Binding*)(pass + pass_header->resource_table_offset);
+    ResourceListLayoutCreation resource_layout_creation = { bindings, pass_header->num_resources };
+    ResourceListLayoutHandle resource_layout = graphics_device.create_resource_list_layout( resource_layout_creation );
+
+
+    // Create pipeline
+    // Setup vertex buffer
+    VertexStream vertex_stream = { 0, sizeof( ImDrawVert ), VertexInputRate::PerVertex };
+    // Setup vertex attributes
+    VertexAttribute vertex_attributes[] = { { 0, 0, 0, VertexComponentFormat::Float2 },
+                                            { 1, 0, 8, VertexComponentFormat::Float2},
+                                            { 2, 0, 16, VertexComponentFormat::UByte4N } };
+
+    PipelineCreation pipeline_creation = {};
+    pipeline_creation.vertex_input = { 1, 3, &vertex_stream, vertex_attributes };
+    pipeline_creation.shaders = &shader_creation;
+
+    pipeline_creation.depth_stencil.depth_enable = 0;
+    pipeline_creation.depth_stencil.stencil_enable = 0;
+
+    pipeline_creation.blend_state.active_states = 1;
+    pipeline_creation.blend_state.blend_states[0].blend_enabled = 1;
+    pipeline_creation.blend_state.blend_states[0].color_operation = BlendOperation::Add;
+    pipeline_creation.blend_state.blend_states[0].source_color = Blend::SrcAlpha;
+    pipeline_creation.blend_state.blend_states[0].destination_color = Blend::InvSrcAlpha;
+
+    pipeline_creation.resource_layout = resource_layout;
+
+    g_imgui_pipeline = graphics_device.create_pipeline( pipeline_creation );
+
+    PipelineDescription pipeline_desc;
+    graphics_device.query_pipeline( g_imgui_pipeline, pipeline_desc );
+
+    ShaderStateDescription shader_desc;
+    graphics_device.query_shader( pipeline_desc.shader, shader_desc );
+
+    // Create constant buffer
+    BufferCreation cb_creation = { BufferType::Constant, ResourceUsageType::Dynamic, 64, nullptr, "CB_ImGui" };
+    g_ui_cb = graphics_device.create_buffer( cb_creation );
+
+    // Create resource list
+    ResourceListCreation::Resource rl_resources[] = { g_ui_cb.handle, g_font_texture.handle };
+    ResourceListCreation rl_creation = { pipeline_creation.resource_layout, rl_resources, 2 };
+    g_ui_resource_list = graphics_device.create_resource_list( rl_creation );
+
+    // Create vertex and index buffers //////////////////////////////////////////
+    BufferCreation vb_creation = { BufferType::Vertex, ResourceUsageType::Dynamic, g_vb_size, nullptr, "VB_ImGui" };
+    g_vb = graphics_device.create_buffer( vb_creation );
+
+    BufferCreation ib_creation = { BufferType::Index, ResourceUsageType::Dynamic, g_ib_size, nullptr, "IB_ImGui" };
+    g_ib = graphics_device.create_buffer( ib_creation );
+
+    return true;
+}
+
+void hydra_Imgui_Shutdown( hydra::graphics::Device& graphics_device ) {
+    
+    graphics_device.destroy_buffer( g_vb );
+    graphics_device.destroy_buffer( g_ib );
+    graphics_device.destroy_buffer( g_ui_cb );
+
+    graphics_device.destroy_pipeline( g_imgui_pipeline );
+    graphics_device.destroy_resource_list( g_ui_resource_list );
+    graphics_device.destroy_texture( g_font_texture );
+}
+
+void hydra_Imgui_NewFrame() {
+    
+}
+
+// OpenGL3 Render function.
+// (this used to be set in io.RenderDrawListsFn and called by ImGui::Render(), but you can now call this directly from your main loop)
+// Note that this implementation is little overcomplicated because we are saving/setting up/restoring every OpenGL state explicitly, in order to be able to run within any OpenGL engine that doesn't do so.
+void hydra_Imgui_RenderDrawData( ImDrawData* draw_data, hydra::graphics::Device& gfx_device, hydra::graphics::CommandBuffer& commands )
+{
+    // Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
+    int fb_width = (int)(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
+    int fb_height = (int)(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
+    if ( fb_width <= 0 || fb_height <= 0 )
+        return;
+
+    bool clip_origin_lower_left = true;
+#if defined(GL_CLIP_ORIGIN) && !defined(__APPLE__)
+    GLenum last_clip_origin = 0; glGetIntegerv( GL_CLIP_ORIGIN, (GLint*)&last_clip_origin ); // Support for GL 4.5's glClipControl(GL_UPPER_LEFT)
+    if ( last_clip_origin == GL_UPPER_LEFT )
+        clip_origin_lower_left = false;
+#endif
+    size_t vertex_size = draw_data->TotalVtxCount * sizeof( ImDrawVert );
+    size_t index_size = draw_data->TotalIdxCount * sizeof( ImDrawIdx );
+
+    if ( vertex_size >= g_vb_size || index_size >= g_ib_size ) {
+        return;
+    }
+
+    if ( vertex_size == 0 && index_size == 0 ) {
+        return;
+    }
+
+    using namespace hydra::graphics;
+
+    // Reset command buffer to write to it again
+    commands.reset();
+
+    // Upload data
+    ImDrawVert* vtx_dst = NULL;
+    ImDrawIdx* idx_dst = NULL;
+
+    MapBufferParameters map_parameters_vb = { g_vb, 0, vertex_size };
+    vtx_dst = (ImDrawVert*)gfx_device.map_buffer( map_parameters_vb );
+
+    if( vtx_dst ) {
+        for ( int n = 0; n < draw_data->CmdListsCount; n++ ) {
+
+            const ImDrawList* cmd_list = draw_data->CmdLists[n];
+            memcpy( vtx_dst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof( ImDrawVert ) );
+            vtx_dst += cmd_list->VtxBuffer.Size;
+        }
+
+        gfx_device.unmap_buffer( map_parameters_vb );
+    }
+
+    MapBufferParameters map_parameters_ib = { g_ib, 0, index_size };
+    idx_dst = (ImDrawIdx*)gfx_device.map_buffer( map_parameters_ib );
+
+    if ( idx_dst  ) {
+        for ( int n = 0; n < draw_data->CmdListsCount; n++ ) {
+            
+            const ImDrawList* cmd_list = draw_data->CmdLists[n];
+            memcpy( idx_dst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof( ImDrawIdx ) );
+            idx_dst += cmd_list->IdxBuffer.Size;
+        }
+
+        gfx_device.unmap_buffer( map_parameters_ib );
+    }
+
+    commands.bind_pipeline( g_imgui_pipeline );
+    commands.bind_vertex_buffer( g_vb );
+    commands.bind_index_buffer( g_ib );
+
+    const Viewport viewport = { 0, 0, (GLsizei)fb_width, (GLsizei)fb_height, 0.0f, 1.0f };
+    commands.set_viewport( viewport );
+
+    // Setup viewport, orthographic projection matrix
+    // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayMin is typically (0,0) for single viewport apps.
+    float L = draw_data->DisplayPos.x;
+    float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
+    float T = draw_data->DisplayPos.y;
+    float B = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
+    const float ortho_projection[4][4] =
+    {
+        { 2.0f / (R - L),   0.0f,         0.0f,   0.0f },
+        { 0.0f,         2.0f / (T - B),   0.0f,   0.0f },
+        { 0.0f,         0.0f,        -1.0f,   0.0f },
+        { (R + L) / (L - R),  (T + B) / (B - T),  0.0f,   1.0f },
+    };
+
+    MapBufferParameters cb_map = { g_ui_cb, 0, 0 };
+    GLfloat* cb_data = (GLfloat*)gfx_device.map_buffer( cb_map );
+    if ( cb_data ) {
+        memcpy(cb_data, &ortho_projection[0][0], 64);
+        gfx_device.unmap_buffer( cb_map );
+    }
+
+    // Will project scissor/clipping rectangles into framebuffer space
+    ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
+    ImVec2 clip_scale = draw_data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
+
+    commands.bind_resource_list( g_ui_resource_list );
+
+    // Render command lists
+    //
+    int counts = draw_data->CmdListsCount;
+
+    size_t vtx_buffer_offset = 0, idx_buffer_offset = 0;
+    for ( int n = 0; n < counts; n++ )
+    {
+        const ImDrawList* cmd_list = draw_data->CmdLists[n];
+        
+        for ( int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++ )
+        {
+            const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+            if ( pcmd->UserCallback )
+            {
+                // User callback (registered via ImDrawList::AddCallback)
+                pcmd->UserCallback( cmd_list, pcmd );
+            }
+            else
+            {
+                // Project scissor/clipping rectangles into framebuffer space
+                ImVec4 clip_rect;
+                clip_rect.x = (pcmd->ClipRect.x - clip_off.x) * clip_scale.x;
+                clip_rect.y = (pcmd->ClipRect.y - clip_off.y) * clip_scale.y;
+                clip_rect.z = (pcmd->ClipRect.z - clip_off.x) * clip_scale.x;
+                clip_rect.w = (pcmd->ClipRect.w - clip_off.y) * clip_scale.y;
+
+                if ( clip_rect.x < fb_width && clip_rect.y < fb_height && clip_rect.z >= 0.0f && clip_rect.w >= 0.0f )
+                {
+                    // Apply scissor/clipping rectangle
+                    if ( clip_origin_lower_left ) {
+                        Rect2D scissor_rect = { (int)clip_rect.x, (int)(fb_height - clip_rect.w), (int)(clip_rect.z - clip_rect.x), (int)(clip_rect.w - clip_rect.y) };
+                        commands.set_scissor( scissor_rect );
+                    }
+                    else {
+                        Rect2D scissor_rect = { (int)clip_rect.x, (int)clip_rect.y, (int)clip_rect.z, (int)clip_rect.w }; // Support for GL 4.5's glClipControl(GL_UPPER_LEFT)
+                        commands.set_scissor( scissor_rect );
+                    }
+
+                    // TODO: solution for custom textures.
+                    //glBindTextureUnit( 0, (GLuint)(intptr_t)pcmd->TextureId );
+
+                    const GLuint start_index_offset = idx_buffer_offset * sizeof( ImDrawIdx );
+                    const GLuint end_index_offset = start_index_offset + pcmd->ElemCount * sizeof( ImDrawIdx );
+                    commands.drawIndexed( hydra::graphics::TopologyType::Triangle, pcmd->ElemCount, 1, idx_buffer_offset, vtx_buffer_offset, 0 );
+                }
+            }
+            idx_buffer_offset += pcmd->ElemCount;
+        }
+
+        vtx_buffer_offset += cmd_list->VtxBuffer.Size;
+    }
+}

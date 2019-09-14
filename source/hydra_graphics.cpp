@@ -7,8 +7,9 @@
 //
 //  Source code     : https://www.github.com/jorenjoestar/HydraGraphics
 //
-//  Date            : 22/05/2019, 18.50
-//  Version         : 0.020
+//  Created         : 22/05/2019, 18.50
+//  Last Modified   : 14/09/2019, 16.10
+//  Version         : 0.04
 //
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -152,9 +153,8 @@ const void* ResourcePool::access_resource( uint32_t handle ) const {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
-// Device
-/////////////////////////////////////////////////////////////////////////////////
+// Device ///////////////////////////////////////////////////////////////////////
+
 HYDRA_STRINGBUFFER s_string_buffer;
 
 void Device::init( const DeviceCreation& creation ) {
@@ -182,9 +182,7 @@ BufferHandle Device::get_fullscreen_vertex_buffer() const {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
-// CommandBuffer
-/////////////////////////////////////////////////////////////////////////////////
+// CommandBuffer ////////////////////////////////////////////////////////////////
 
 void CommandBuffer::init( QueueType::Enum type, uint32_t size ) {
     this->type = type;
@@ -204,9 +202,24 @@ void CommandBuffer::bind_vertex_buffer( BufferHandle handle ) {
     bind->buffer = handle;
 }
 
-void CommandBuffer::bind_resource_set( ResourceSetHandle handle ) {
-    commands::BindResourceSet* bind = write_command<commands::BindResourceSet>();
+void CommandBuffer::bind_index_buffer( BufferHandle handle ) {
+    commands::BindIndexBuffer* bind = write_command< commands::BindIndexBuffer>();
+    bind->buffer = handle;
+}
+
+void CommandBuffer::bind_resource_list( ResourceListHandle handle ) {
+    commands::BindResourceList* bind = write_command<commands::BindResourceList>();
     bind->handle = handle;
+}
+
+void CommandBuffer::set_viewport( const Viewport& viewport ) {
+    commands::SetViewport* set = write_command<commands::SetViewport>();
+    set->viewport = viewport;
+}
+
+void CommandBuffer::set_scissor( const Rect2D& rect ) {
+    commands::SetScissor* set = write_command<commands::SetScissor>();
+    set->rect = rect;
 }
 
 void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t count ) {
@@ -217,6 +230,18 @@ void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t 
     draw_command->vertex_count = count;
 }
 
+void CommandBuffer::drawIndexed( TopologyType::Enum topology, uint32_t index_count, uint32_t instance_count,
+                                 uint32_t first_index, int32_t vertex_offset, uint32_t first_instance ) {
+    commands::DrawIndexed* draw_command = write_command<commands::DrawIndexed>();
+
+    draw_command->topology = topology;
+    draw_command->index_count = index_count;
+    draw_command->instance_count = instance_count;
+    draw_command->first_index = first_index;
+    draw_command->vertex_offset = vertex_offset;
+    draw_command->first_instance = first_instance;
+}
+
 void CommandBuffer::dispatch( uint8_t group_x, uint8_t group_y, uint8_t group_z ) {
     commands::Dispatch* command = write_command<commands::Dispatch>();
     command->group_x = group_x;
@@ -225,20 +250,18 @@ void CommandBuffer::dispatch( uint8_t group_x, uint8_t group_y, uint8_t group_z 
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
-// API Specific
-/////////////////////////////////////////////////////////////////////////////////
+// API Specific /////////////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////////////////////
-// OpenGL
-/////////////////////////////////////////////////////////////////////////////////
+
+// OpenGL ///////////////////////////////////////////////////////////////////////
+
 #if defined (HYDRA_OPENGL)
 
 // Defines
 // TODO: until enums are not exported anymore, add + 1, max is not count!
 
 // Enum translations. Use tables or switches depending on the case.
-static GLuint translate_gl_target( TextureType::Enum type ) {
+static GLuint to_gl_target( TextureType::Enum type ) {
     static GLuint s_gl_target[TextureType::Count] = { GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_CUBE_MAP_ARRAY };
     return s_gl_target[type];
 }
@@ -740,7 +763,7 @@ static GLuint to_gl_shader_stage( ShaderStage::Enum stage ) {
 //
 //
 static GLuint to_gl_buffer_type( BufferType::Enum type ) {
-    static GLuint s_gl_buffer_types[BufferType::Count] = { GL_ARRAY_BUFFER, GL_INDEX_ARRAY, GL_UNIFORM_BUFFER, GL_DRAW_INDIRECT_BUFFER };
+    static GLuint s_gl_buffer_types[BufferType::Count] = { GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, GL_UNIFORM_BUFFER, GL_DRAW_INDIRECT_BUFFER };
     return s_gl_buffer_types[type];
 }
 
@@ -752,58 +775,144 @@ static GLuint to_gl_buffer_usage( ResourceUsageType::Enum type ) {
     return s_gl_buffer_types[type];
 }
 
-
-// Structs
 //
 //
-struct ShaderStateGL : public ShaderState {
+//
+static GLuint to_gl_comparison( ComparisonFunction::Enum comparison ) {
+    static GLuint s_gl_comparison[ComparisonFunction::Enum::Count] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_LEQUAL, GL_GREATER, GL_NOTEQUAL, GL_GEQUAL, GL_ALWAYS };
+    return s_gl_comparison[comparison];
+}
 
+//
+//
+//
+static GLenum to_gl_blend_function( Blend::Enum blend ) {
+    static GLenum s_gl_blend_function[] = { GL_ZERO, GL_ONE, GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR,
+                                            GL_SRC_ALPHA_SATURATE, GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR, GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA };
+    return s_gl_blend_function[blend];
+}
+
+//
+//
+//
+static GLenum to_gl_blend_equation( BlendOperation::Enum blend ) {
+    static GLenum s_gl_blend_equation[] = { GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT, GL_MIN, GL_MAX };
+    return s_gl_blend_equation[blend];
+}
+
+//
+//
+// Float, Float2, Float3, Float4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Count
+static GLuint to_gl_components( VertexComponentFormat::Enum format ) {
+    static GLuint s_gl_components[] = { 1, 2, 3, 4, 1, 4, 1, 4, 2, 2, 4, 4 };
+    return s_gl_components[format];
+}
+
+static GLenum to_gl_vertex_type( VertexComponentFormat::Enum format ) {
+    static GLenum s_gl_vertex_type[] = { GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_BYTE, GL_BYTE, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_SHORT, GL_SHORT, GL_SHORT, GL_SHORT };
+    return s_gl_vertex_type[format];
+}
+
+static GLboolean to_gl_vertex_norm( VertexComponentFormat::Enum format ) {
+    static GLboolean s_gl_vertex_norm[] = { GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE };
+    return s_gl_vertex_norm[format];
+}
+
+
+
+// Structs //////////////////////////////////////////////////////////////////////
+
+//
+//
+struct ShaderStateGL {
+
+    const char*                     name                = nullptr;
     GLuint                          gl_program          = 0;
 
 }; // struct ShaderState
 
 //
 //
-struct TextureGL : public Texture {
+struct BufferGL {
+    
+    BufferType::Enum                type                = BufferType::Vertex;
+    ResourceUsageType::Enum         usage               = ResourceUsageType::Immutable;
+    uint32_t                        size                = 0;
+    const char*                     name                = nullptr;
+
+    GLuint                          gl_handle           = 0;
+    GLuint                          gl_type             = 0;
+    GLuint                          gl_usage            = 0;
+    GLuint                          gl_vao_handle       = 0;        // Special case for Vertex Arrays. They need both this AND a buffer.
+
+}; // struct BufferGL
+
+//
+//
+struct TextureGL {
+
+    uint16_t                        width               = 1;
+    uint16_t                        height              = 1;
+    uint16_t                        depth               = 1;
+    uint8_t                         mipmaps             = 1;
+    uint8_t                         render_target       = 0;
+
+    TextureFormat::Enum             format              = TextureFormat::UNKNOWN;
+    TextureType::Enum               type                = TextureType::Texture2D;
+
 
     GLuint                          gl_handle           = 0;
     GLuint                          gl_target           = 0;
 
 }; // struct TextureGL
 
+static const uint32_t               k_max_vertex_streams = 4;
+static const uint32_t               k_max_vertex_attributes = 16;
+
+struct VertexInputGL {
+
+    uint32_t                        num_streams;
+    uint32_t                        num_attributes;
+    VertexStream                    vertex_streams[k_max_vertex_streams];
+    VertexAttribute                 vertex_attributes[k_max_vertex_attributes];
+
+}; // struct VertexInputGL
+
 //
 //
-struct BufferGL : public Buffer {
+struct PipelineGL {
 
-    GLuint                          gl_handle           = 0;
-    GLuint                          gl_type             = 0;
-    GLuint                          gl_usage            = 0;
-
-}; // struct BufferGL
-
-//
-//
-struct PipelineGL : public Pipeline {
-
+    ShaderHandle                    shader_state;
     GLuint                          gl_program_cached   = 0;
 
-    const ResourceSetLayoutGL*      resource_set_layout = nullptr;
-    // Blend state
-    // Depth state
-    // Rasterization state
+    const ResourceListLayoutGL*     resource_list_layout = nullptr;
+    
+    DepthStencilCreation            depth_stencil;
+    BlendStateCreation              blend_state;
+    VertexInputGL                   vertex_input;
+    RasterizationCreation           rasterization;
+
+    bool                            graphics_pipeline   = true;
 
 }; // struct PipelineGL
 
 //
 //
-struct SamplerGL : public Sampler {
+struct SamplerGL {
 
 }; // struct SamplerGL
 
 
 //
 //
-struct ResourceBindingGL : public ResourceBinding {
+struct ResourceBindingGL {
+
+    uint16_t                        type                = 0;    // ResourceType
+    uint16_t                        start               = 0;
+    uint16_t                        count               = 0;
+    uint16_t                        set                 = 0;
+
+    const char*                     name                = nullptr;
 
     GLuint                          gl_block_index      = 0;
     GLint                           gl_block_binding    = 0;
@@ -811,18 +920,21 @@ struct ResourceBindingGL : public ResourceBinding {
 
 //
 //
-struct ResourceSetLayoutGL : public ResourceSetLayout {
+struct ResourceListLayoutGL {
 
     ResourceBindingGL*              bindings            = nullptr;
     uint32_t                        num_bindings        = 0;
 
-}; // struct ResourceSetLayoutGL
+}; // struct ResourceListLayoutGL
 
 //
 //
-struct ResourceSetGL : public ResourceSet {
+struct ResourceListGL {
 
-    const ResourceSetLayoutGL*      layout              = nullptr;
+    const ResourceListLayoutGL*     layout              = nullptr;
+    ResourceData*                   resources           = nullptr;
+    uint32_t                        num_resources       = 0;
+
 
     void                            set() const {
 
@@ -831,7 +943,7 @@ struct ResourceSetGL : public ResourceSet {
         }
 
         // TODO: this is the first version. Just sets textures.
-        for ( uint32_t r = 0; r < num_resources; ++r ) {
+        for ( uint32_t r = 0; r < layout->num_bindings; ++r ) {
             const ResourceBindingGL& binding = layout->bindings[r];
 
             if ( binding.gl_block_binding == -1 )
@@ -874,16 +986,128 @@ struct ResourceSetGL : public ResourceSet {
         }
     }
 
-}; // struct ResourceSetGL
+}; // struct ResourceListGL
 
-// Methods
+//
+// Holds all the states necessary to render.
+struct DeviceStateGL {
+
+
+    GLuint                          vb_handle           = 0;
+    GLuint                          vao_handle          = 0;
+    GLuint                          ib_handle           = 0;
+    const Viewport*                 viewport            = nullptr;
+    const Rect2D*                   scissor             = nullptr;
+    const PipelineGL*               pipeline            = nullptr;
+    const ResourceListGL*           resource_list       = nullptr;
+
+    void                            apply() {
+
+        if ( pipeline->graphics_pipeline ) {
+            // Bind Vertex Buffer
+            glBindBuffer( GL_ARRAY_BUFFER, vb_handle );
+            glBindVertexArray( vao_handle );
+
+            // Bind Index Buffer
+            glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ib_handle );
+
+            if ( viewport )
+                glViewport( viewport->rect.x, viewport->rect.y, viewport->rect.width, viewport->rect.height );
+
+            if ( scissor ) {
+                glEnable( GL_SCISSOR_TEST );
+                glScissor( scissor->x, scissor->y, scissor->width, scissor->height );
+            }
+
+            // Bind shaders
+            glUseProgram( pipeline->gl_program_cached );
+
+            if ( resource_list )
+                resource_list->set();
+
+            glDisable( GL_SCISSOR_TEST );
+
+            // Set depth
+            if ( pipeline->depth_stencil.depth_enable ) {
+                glEnable( GL_DEPTH_TEST );
+                glDepthFunc( to_gl_comparison( pipeline->depth_stencil.depth_comparison ) );
+                glDepthMask( pipeline->depth_stencil.depth_write_enable );
+            } else {
+                glDisable( GL_DEPTH_TEST );
+                glDepthMask( false );
+            }
+
+            // Set stencil
+            if ( pipeline->depth_stencil.stencil_enable ) {
+                HYDRA_ASSERT( false, "Not implemented." );
+            } else {
+                glDisable( GL_STENCIL_TEST );
+            }
+
+            // Set blend
+            if ( pipeline->blend_state.active_states ) {
+                // If there is different states, set them accordingly.
+                glEnablei( GL_BLEND, 0 );
+
+                const BlendState& blend_state = pipeline->blend_state.blend_states[0];
+                glBlendFunc( to_gl_blend_function( blend_state.source_color ),
+                             to_gl_blend_function( blend_state.destination_color ) );
+
+                glBlendEquation( to_gl_blend_equation( blend_state.color_operation ) );
+            } else if ( pipeline->blend_state.active_states > 1 ) {
+                HYDRA_ASSERT( false, "Not implemented." );
+
+                //glBlendFuncSeparate( glSrcFunction, glDstFunction, glSrcAlphaFunction, glDstAlphaFunction );
+            } else {
+                glDisable( GL_BLEND );
+            }
+
+            const RasterizationCreation& rasterization = pipeline->rasterization;
+            if ( rasterization.cull_mode == CullMode::None ) {
+                glDisable( GL_CULL_FACE );
+            }
+            else {
+                glEnable( GL_CULL_FACE );
+                glFrontFace( rasterization.cull_mode == CullMode::Front ? GL_FRONT : GL_BACK );
+            }
+
+            glFrontFace( rasterization.front == FrontClockwise::True ? GL_CW : GL_CCW );
+            
+            const VertexInputGL& vertex_input = pipeline->vertex_input;
+            for ( uint32_t i = 0; i < vertex_input.num_streams; i++ ) {
+                const VertexStream& stream = vertex_input.vertex_streams[i];
+                glBindVertexBuffer( stream.binding, vb_handle, 0, stream.stride );
+            }
+
+            for ( uint32_t i = 0; i < vertex_input.num_attributes; i++ ) {
+                const VertexAttribute& attribute = vertex_input.vertex_attributes[i];
+                glEnableVertexAttribArray( attribute.location );
+                glVertexAttribFormat( attribute.location, to_gl_components( attribute.format ), to_gl_vertex_type( attribute.format ),
+                                      to_gl_vertex_norm( attribute.format ), attribute.offset );
+                glVertexAttribBinding( attribute.location, attribute.binding );
+            }
+
+        }
+        else {
+
+            glUseProgram( pipeline->gl_program_cached );
+
+            if ( resource_list )
+                resource_list->set();
+        }
+        
+    }
+
+}; // struct DeviceStateGL
+
+// Methods //////////////////////////////////////////////////////////////////////
 
 // Forward declarations
 static GLuint                       compile_shader( GLuint stage, const char* source );
 static bool                         get_compile_info( GLuint shader, GLuint status );
 static bool                         get_link_info( GLuint shader, GLuint status );
 
-static void                         cache_resource_bindings( GLuint shader, const ResourceSetLayoutGL* resource_set_layout );
+static void                         cache_resource_bindings( GLuint shader, const ResourceListLayoutGL* resource_set_layout );
 
 // Tests
 static void                         test_texture_creation( Device& device );
@@ -904,12 +1128,15 @@ void Device::backend_init( const DeviceCreation& creation ) {
     buffers.init( 128, sizeof( BufferGL ) );
     pipelines.init( 128, sizeof( PipelineGL ) );
     samplers.init( 32, sizeof( SamplerGL ) );
-    resource_layouts.init( 128, sizeof( ResourceSetLayoutGL ) );
-    resource_sets.init( 128, sizeof( ResourceSetGL ) );
+    resource_list_layouts.init( 128, sizeof( ResourceListLayoutGL ) );
+    resource_lists.init( 128, sizeof( ResourceListGL ) );
 
     // During init, enable debug output
     glEnable( GL_DEBUG_OUTPUT );
+    glEnable( GL_DEBUG_OUTPUT_SYNCHRONOUS );
     glDebugMessageCallback( gl_message_callback, 0 );
+
+    device_state = new DeviceStateGL();
 
 #if defined (HYDRA_GRAPHICS_TEST)
     test_texture_creation( *this );
@@ -920,27 +1147,27 @@ void Device::backend_init( const DeviceCreation& creation ) {
     //
     // Init primitive resources
     // Fullscreen
-    fullscreen_vertex_buffer.handle = buffers.obtain_resource();
-    if ( fullscreen_vertex_buffer.handle == k_invalid_handle ) {
-        HYDRA_ASSERT( false, "Error in creation of 1 buffer. Quitting" );
-    }
-
-    BufferGL* fullscree_vb = access_buffer( fullscreen_vertex_buffer );
-    glGenVertexArrays( 1, &fullscreen_vertex_buffer.handle );
+    BufferCreation fullscreen_vb_creation = { BufferType::Vertex, ResourceUsageType::Immutable, 0, nullptr, "Fullscreen_vb" };
+    fullscreen_vertex_buffer = create_buffer( fullscreen_vb_creation );
 }
 
 void Device::backend_terminate() {
+
+    glDisable( GL_DEBUG_OUTPUT_SYNCHRONOUS );
     glDisable( GL_DEBUG_OUTPUT );
+
+    delete device_state;
 
     pipelines.terminate();
     buffers.terminate();
     shaders.terminate();
     textures.terminate();
     samplers.terminate();
-    resource_layouts.terminate();
-    resource_sets.terminate();
+    resource_list_layouts.terminate();
+    resource_lists.terminate();
 }
 
+// Resource Access //////////////////////////////////////////////////////////////
 ShaderStateGL* Device::access_shader( ShaderHandle shader ) {
     return (ShaderStateGL*)shaders.access_resource( shader.handle );
 }
@@ -981,22 +1208,23 @@ const SamplerGL* Device::access_sampler( SamplerHandle sampler ) const {
     return (const SamplerGL*)samplers.access_resource( sampler.handle );
 }
 
-ResourceSetLayoutGL* Device::access_resource_set_layout( ResourceSetLayoutHandle resource_layout ) {
-    return (ResourceSetLayoutGL*)resource_layouts.access_resource( resource_layout.handle );
+ResourceListLayoutGL* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
+    return (ResourceListLayoutGL*)resource_list_layouts.access_resource( resource_layout.handle );
 }
 
-const ResourceSetLayoutGL* Device::access_resource_set_layout( ResourceSetLayoutHandle resource_layout ) const {
-    return (const ResourceSetLayoutGL*)resource_layouts.access_resource( resource_layout.handle );
+const ResourceListLayoutGL* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) const {
+    return (const ResourceListLayoutGL*)resource_list_layouts.access_resource( resource_layout.handle );
 }
 
-ResourceSetGL* Device::access_resource_set( ResourceSetHandle resource_set ) {
-    return (ResourceSetGL*)resource_sets.access_resource( resource_set.handle );
+ResourceListGL* Device::access_resource_list( ResourceListHandle resource_set ) {
+    return (ResourceListGL*)resource_lists.access_resource( resource_set.handle );
 }
 
-const ResourceSetGL* Device::access_resource_set( ResourceSetHandle resource_set ) const {
-    return (const ResourceSetGL*)resource_sets.access_resource( resource_set.handle );
+const ResourceListGL* Device::access_resource_list( ResourceListHandle resource_set ) const {
+    return (const ResourceListGL*)resource_lists.access_resource( resource_set.handle );
 }
 
+// Resource Creation ////////////////////////////////////////////////////////////
 TextureHandle Device::create_texture( const TextureCreation& creation ) {
 
     uint32_t resource_index = textures.obtain_resource();
@@ -1007,7 +1235,7 @@ TextureHandle Device::create_texture( const TextureCreation& creation ) {
 
     GLuint gl_handle;
     glGenTextures( 1, &gl_handle );
-    const GLuint gl_target = translate_gl_target(creation.type);
+    const GLuint gl_target = to_gl_target(creation.type);
 
     glBindTexture( gl_target, gl_handle );
 
@@ -1019,12 +1247,17 @@ TextureHandle Device::create_texture( const TextureCreation& creation ) {
     const GLuint gl_format = to_gl_format(creation.format);
     const GLuint gl_type = to_gl_format_type(creation.format);
 
+    // TODO: when is this needed ?
+    //#ifdef GL_UNPACK_ROW_LENGTH
+    //    glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
+    //#endif
+
     switch ( creation.type ) {
         case TextureType::Texture2D:
         {
             GLint level = 0;
             GLint border = 0;
-            glTexImage2D( gl_target, level, gl_internal_format, creation.width, creation.height, border, gl_format, gl_type, nullptr );
+            glTexImage2D( gl_target, level, gl_internal_format, creation.width, creation.height, border, gl_format, gl_type, creation.initial_data );
             break;
         }
 
@@ -1093,9 +1326,7 @@ ShaderHandle Device::create_shader( const ShaderCreation& creation ) {
     }
 
     // If all the stages are compiled, link them.
-
     bool creation_failed = compiled_shaders != creation.stages_count;
-    // Link and 
     if (!creation_failed) {
 
         glLinkProgram( gl_program );
@@ -1129,13 +1360,40 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
     }
 
     PipelineGL* pipeline = access_pipeline( handle );
-    ShaderStateGL* shader_state = access_shader( creation.shader_state );
 
-    pipeline->shader_state = creation.shader_state;
-    pipeline->gl_program_cached = shader_state->gl_program;
-    pipeline->resource_set_layout = access_resource_set_layout( creation.resource_layout );
+    // Create all necessary resources
+    ShaderHandle shader_state = create_shader( *creation.shaders );
+    ShaderStateGL* shader_state_data = access_shader( shader_state );
 
-    cache_resource_bindings( pipeline->gl_program_cached, pipeline->resource_set_layout );
+    pipeline->shader_state = shader_state;
+    pipeline->gl_program_cached = shader_state_data->gl_program;
+
+    if ( !creation.compute ) {
+        // Copy render states from creation
+        pipeline->depth_stencil = creation.depth_stencil;
+        pipeline->blend_state = creation.blend_state;
+        pipeline->rasterization = creation.rasterization;
+
+        VertexInputGL& vertex_input = pipeline->vertex_input;
+        // Copy vertex input (streams + attributes)
+        const VertexInputCreation& vertex_input_creation = creation.vertex_input;
+
+        vertex_input.num_streams = vertex_input_creation.num_vertex_streams;
+        vertex_input.num_attributes = vertex_input_creation.num_vertex_attributes;
+
+        memcpy( vertex_input.vertex_streams, vertex_input_creation.vertex_streams, vertex_input_creation.num_vertex_streams * sizeof( VertexStream ) );
+        memcpy( vertex_input.vertex_attributes, vertex_input_creation.vertex_attributes, vertex_input_creation.num_vertex_attributes * sizeof( VertexAttribute ) );
+
+        pipeline->graphics_pipeline = true;
+    }
+    else {
+        pipeline->graphics_pipeline = false;
+    }
+
+    // Resource List Layout
+    pipeline->resource_list_layout = access_resource_list_layout( creation.resource_layout );
+
+    cache_resource_bindings( pipeline->gl_program_cached, pipeline->resource_list_layout );
 
     return handle;
 }
@@ -1153,17 +1411,41 @@ BufferHandle Device::create_buffer( const BufferCreation& creation ) {
     buffer->type = creation.type;
     buffer->usage = creation.usage;
 
-    glGenBuffers( 1, &buffer->gl_handle );
     buffer->gl_type = to_gl_buffer_type( creation.type );
     buffer->gl_usage = to_gl_buffer_usage( creation.usage );
-
-    glBindBuffer( buffer->gl_type, buffer->gl_handle );
-    glBufferData( buffer->gl_type, buffer->size, creation.initial_data, buffer->gl_usage );
-    glBindBuffer( buffer->gl_type, 0 );
 
     switch ( creation.type ) {
         case BufferType::Constant:
         {
+            // Use glCreateBuffers to use the named versions of calls.
+            glCreateBuffers( 1, &buffer->gl_handle );
+            glNamedBufferData( buffer->gl_handle, buffer->size, creation.initial_data, buffer->gl_usage );
+
+            break;
+        }
+
+        case BufferType::Vertex:
+        {
+            // Create both a buffer AND a vertex array object.
+            glCreateBuffers( 1, &buffer->gl_handle );
+            glNamedBufferData( buffer->gl_handle, buffer->size, creation.initial_data, buffer->gl_usage );
+
+            glCreateVertexArrays( 1, &buffer->gl_vao_handle );
+
+            break;
+        }
+
+        case BufferType::Index:
+        {
+            glCreateBuffers( 1, &buffer->gl_handle );
+            glNamedBufferData( buffer->gl_handle, buffer->size, creation.initial_data, buffer->gl_usage );
+
+            break;
+        }
+
+        default:
+        {
+            HYDRA_ASSERT( false, "Not implemented!" );
             break;
         }
     }
@@ -1181,13 +1463,13 @@ SamplerHandle Device::create_sampler( const SamplerCreation& creation ) {
     return handle;
 }
 
-ResourceSetLayoutHandle Device::create_resource_set_layout( const ResourceSetLayoutCreation& creation ) {
-    ResourceSetLayoutHandle handle = { resource_layouts.obtain_resource() };
+ResourceListLayoutHandle Device::create_resource_list_layout( const ResourceListLayoutCreation& creation ) {
+    ResourceListLayoutHandle handle = { resource_list_layouts.obtain_resource() };
     if ( handle.handle == k_invalid_handle ) {
         return handle;
     }
 
-    ResourceSetLayoutGL* resource_layout = access_resource_set_layout( handle );
+    ResourceListLayoutGL* resource_layout = access_resource_list_layout( handle );
 
     // TODO: add support for multiple sets.
     // Create flattened binding list
@@ -1205,21 +1487,21 @@ ResourceSetLayoutHandle Device::create_resource_set_layout( const ResourceSetLay
     return handle;
 }
 
-ResourceSetHandle Device::create_resource_set( const ResourceSetCreation& creation ) {
-    ResourceSetHandle handle = { resource_sets.obtain_resource() };
+ResourceListHandle Device::create_resource_list( const ResourceListCreation& creation ) {
+    ResourceListHandle handle = { resource_lists.obtain_resource() };
     if ( handle.handle == k_invalid_handle ) {
         return handle;
     }
 
-    ResourceSetGL* resources = access_resource_set( handle );
-    resources->layout = access_resource_set_layout( creation.layout );
+    ResourceListGL* resources = access_resource_list( handle );
+    resources->layout = access_resource_list_layout( creation.layout );
 
-    resources->resources = (ResourceSet::Resource*)malloc( sizeof( ResourceSet::Resource ) * creation.num_resources );
+    resources->resources = (ResourceData*)malloc( sizeof( ResourceData ) * creation.num_resources );
     resources->num_resources = creation.num_resources;
     
     // Set all resources
     for ( uint32_t r = 0; r < creation.num_resources; ++r ) {
-        ResourceSet::Resource& resource = resources->resources[r];
+        ResourceData& resource = resources->resources[r];
 
         const ResourceBindingGL binding = resources->layout->bindings[r];
         
@@ -1241,11 +1523,16 @@ ResourceSetHandle Device::create_resource_set( const ResourceSetCreation& creati
                 resource.data = (void*)buffer;
                 break;
             }
+
+            default:
+                break;
         }
     }
 
     return handle;
 }
+
+// Resource Destruction /////////////////////////////////////////////////////////
 
 void Device::destroy_buffer( BufferHandle buffer ) {
     if ( buffer.handle != k_invalid_handle ) {
@@ -1295,75 +1582,85 @@ void Device::destroy_sampler( SamplerHandle sampler ) {
     }
 }
 
-void Device::destroy_resource_layout( ResourceSetLayoutHandle resource_layout ) {
+void Device::destroy_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
     if ( resource_layout.handle != k_invalid_handle ) {
 
-        resource_layouts.release_resource( resource_layout.handle );
+        resource_list_layouts.release_resource( resource_layout.handle );
     }
 }
 
-void Device::destroy_resource_set( ResourceSetHandle resource_set ) {
+void Device::destroy_resource_list( ResourceListHandle resource_set ) {
     if ( resource_set.handle != k_invalid_handle ) {
 
-        resource_sets.release_resource( resource_set.handle );
+        resource_lists.release_resource( resource_set.handle );
     }
 }
 
-const Buffer* Device::query_buffer( BufferHandle buffer ) {
+// Resource Description Query ///////////////////////////////////////////////////
+
+void Device::query_buffer( BufferHandle buffer, BufferDescription& out_description ) {
     if ( buffer.handle != k_invalid_handle ) {
-        const Buffer* buffer_data = access_buffer( buffer );
-        return buffer_data;
+        const BufferGL* buffer_data = access_buffer( buffer );
+
+        out_description.name = buffer_data->name;
+        out_description.size = buffer_data->size;
+        out_description.type = buffer_data->type;
+        out_description.usage = buffer_data->usage;
+        out_description.native_handle = (void*)&buffer_data->gl_handle;
     }
-    return nullptr;
 }
 
-const Texture* Device::query_texture( TextureHandle texture ) {
+void Device::query_texture( TextureHandle texture, TextureDescription& out_description ) {
     if ( texture.handle != k_invalid_handle ) {
-        const Texture* texture_data = access_texture( texture );
-        return texture_data;
+        const TextureGL* texture_data = access_texture( texture );
+
+        out_description.width = texture_data->width;
+        out_description.height = texture_data->height;
+        out_description.depth = texture_data->depth;
+        out_description.format = texture_data->format;
+        out_description.mipmaps = texture_data->mipmaps;
+        out_description.type = texture_data->type;
+        out_description.render_target = texture_data->render_target;
+        out_description.native_handle = (void*)&texture_data->gl_handle;
     }
-    return nullptr;
 }
 
-const ShaderState* Device::query_shader( ShaderHandle shader ) {
+void Device::query_shader( ShaderHandle shader, ShaderStateDescription& out_description ) {
     if ( shader.handle != k_invalid_handle ) {
-        const ShaderState* shader_state = access_shader( shader );
-        return shader_state;
+        const ShaderStateGL* shader_state = access_shader( shader );
+
+        out_description.name = shader_state->name;
+        out_description.native_handle = (void*)&shader_state->gl_program;
     }
-    return nullptr;
 }
 
-const Pipeline* Device::query_pipeline( PipelineHandle pipeline ) {
+void Device::query_pipeline( PipelineHandle pipeline, PipelineDescription& out_description ) {
     if ( pipeline.handle != k_invalid_handle ) {
-        const Pipeline* pipeline_data = access_pipeline( pipeline );
-        return pipeline_data;
+        const PipelineGL* pipeline_data = access_pipeline( pipeline );
+
+        out_description.shader = pipeline_data->shader_state;
     }
-    return nullptr;
 }
 
-const Sampler* Device::query_sampler( SamplerHandle sampler ) {
+void Device::query_sampler( SamplerHandle sampler, SamplerDescription& out_description ) {
     if ( sampler.handle != k_invalid_handle ) {
-        const Sampler* sampler_data = access_sampler( sampler );
-        return sampler_data;
+        const SamplerGL* sampler_data = access_sampler( sampler );
     }
-    return nullptr;
 }
 
-const ResourceSetLayout* Device::query_resource_set_layout( ResourceSetLayoutHandle resource_layout ) {
+void Device::query_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
     if ( resource_layout.handle != k_invalid_handle ) {
-        const ResourceSetLayout* resource_set_layout = access_resource_set_layout( resource_layout );
-        return resource_set_layout;
+        const ResourceListLayoutGL* resource_set_layout = access_resource_list_layout( resource_layout );
     }
-    return nullptr;
 }
 
-const ResourceSet* Device::query_resource_set( ResourceSetHandle resource_set ) {
+void Device::query_resource_list( ResourceListHandle resource_set ) {
     if ( resource_set.handle != k_invalid_handle ) {
-        const ResourceSet* resource_set_data = access_resource_set( resource_set );
-        return resource_set_data;
+        const ResourceListGL* resource_set_data = access_resource_list( resource_set );
     }
-    return nullptr;
 }
+
+// Resource Map/Unmap ///////////////////////////////////////////////////////////
 
 void* Device::map_buffer( const MapBufferParameters& parameters ) {
     if ( parameters.buffer.handle == k_invalid_handle )
@@ -1383,7 +1680,11 @@ void Device::unmap_buffer( const MapBufferParameters& parameters ) {
     glUnmapNamedBuffer( buffer->gl_handle );
 }
 
+// Other methods ////////////////////////////////////////////////////////////////
+
 void Device::execute_command_buffer( CommandBuffer* command_buffer ) {
+
+    // Local cache of data to be shared amongst commands.
 
     while ( !command_buffer->end_of_stream() ) {
         CommandType::Enum command_type = command_buffer->get_command_type();
@@ -1392,7 +1693,37 @@ void Device::execute_command_buffer( CommandBuffer* command_buffer ) {
             case CommandType::BindVertexBuffer:
             {
                 const commands::BindVertexBuffer& binding = command_buffer->read_command<commands::BindVertexBuffer>();
-                glBindVertexArray( binding.buffer.handle );
+                BufferGL* buffer = access_buffer( binding.buffer );
+
+                device_state->vao_handle = buffer->gl_vao_handle;
+                device_state->vb_handle = buffer->gl_handle;
+
+                break;
+            }
+
+            case CommandType::BindIndexBuffer:
+            {
+                const commands::BindIndexBuffer& binding = command_buffer->read_command<commands::BindIndexBuffer>();
+                BufferGL* buffer = access_buffer( binding.buffer );
+
+                device_state->ib_handle = buffer->gl_handle;
+
+                break;
+            }
+
+            case CommandType::SetViewport:
+            {
+                const commands::SetViewport& set = command_buffer->read_command<commands::SetViewport>();
+                device_state->viewport = &set.viewport;
+
+                break;
+            }
+
+            case CommandType::SetScissor:
+            {
+                const commands::SetScissor& set = command_buffer->read_command<commands::SetScissor>();
+                device_state->scissor = &set.rect;
+                
                 break;
             }
 
@@ -1400,13 +1731,26 @@ void Device::execute_command_buffer( CommandBuffer* command_buffer ) {
             {
                 const commands::BindPipeline& binding = command_buffer->read_command<commands::BindPipeline>();
                 const PipelineGL* pipeline = access_pipeline( binding.handle );
-                glUseProgram( pipeline->gl_program_cached );
+
+                device_state->pipeline = pipeline;
+
+                break;
+            }
+
+            case CommandType::BindResourceSet:
+            {
+                const commands::BindResourceList& binding = command_buffer->read_command<commands::BindResourceList>();
+                const ResourceListGL* resource_list = access_resource_list( binding.handle );
+
+                device_state->resource_list = resource_list;
 
                 break;
             }
 
             case CommandType::Dispatch:
             {
+                device_state->apply();
+
                 const commands::Dispatch& dispatch = command_buffer->read_command<commands::Dispatch>();
                 glDispatchCompute( dispatch.group_x, dispatch.group_y, dispatch.group_z );
 
@@ -1416,26 +1760,32 @@ void Device::execute_command_buffer( CommandBuffer* command_buffer ) {
                 break;
             }
 
-            case CommandType::BindResourceSet:
-            {
-                const commands::BindResourceSet& binding = command_buffer->read_command<commands::BindResourceSet>();
-                const ResourceSetGL* resource_set = access_resource_set( binding.handle );
-
-                resource_set->set();
-
-                break;
-            }
-
             case CommandType::Draw:
             {
+                device_state->apply();
+
                 const commands::Draw& draw = command_buffer->read_command<commands::Draw>();
                 glDrawArrays( GL_TRIANGLES, draw.first_vertex, draw.vertex_count );
                 
                 break;
             }
 
+            case CommandType::DrawIndexed:
+            {
+                device_state->apply();
+
+                const commands::DrawIndexed& draw = command_buffer->read_command<commands::DrawIndexed>();
+                const uint32_t index_buffer_size = 2;
+                const GLuint start = 0;
+                const GLuint start_index_offset = draw.first_index * index_buffer_size;
+                const GLuint end_index_offset = start_index_offset + draw.index_count * index_buffer_size;
+                glDrawRangeElementsBaseVertex( GL_TRIANGLES, start_index_offset, end_index_offset, (GLsizei)draw.index_count, GL_UNSIGNED_SHORT, (void*)start_index_offset, draw.vertex_offset );
+                break;
+            }
+
             default:
             {
+                HYDRA_ASSERT( false, "Not implemented" );
                 break;
             }
         }
@@ -1508,11 +1858,51 @@ bool get_link_info( GLuint program, GLuint status ) {
     return true;
 }
 
-void GLAPIENTRY gl_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
-    HYDRA_LOG( "GL Error: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message );
+static cstring to_string_message_type( GLenum type ) {
+    switch ( type )
+    {
+        case GL_DEBUG_TYPE_ERROR_ARB:
+            return "GL ERROR       ";
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:
+            return "GL Deprecated  ";
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:
+            return "GL Undefined   ";
+        case GL_DEBUG_TYPE_PORTABILITY_ARB:
+            return "GL Portability ";
+        case GL_DEBUG_TYPE_PERFORMANCE_ARB:
+            return "GL Performance ";
+        case GL_DEBUG_TYPE_MARKER:
+            return "GL Marker      ";
+        case GL_DEBUG_TYPE_PUSH_GROUP:
+            return "GL Push Group  ";
+        case GL_DEBUG_TYPE_POP_GROUP:
+            return "GL Pop Group   ";
+        default:
+            return "GL Generic     ";
+    }
 }
 
-void cache_resource_bindings( GLuint shader, const ResourceSetLayoutGL* resource_set_layout ) {
+static cstring to_string_message_severity( GLenum severity ) {
+    switch ( severity )
+    {
+        case GL_DEBUG_SEVERITY_NOTIFICATION:
+            return "-Log -:";
+        case GL_DEBUG_SEVERITY_HIGH_ARB:
+            return "-High-:";
+        case GL_DEBUG_SEVERITY_MEDIUM_ARB:
+            return "-Mid -:";
+        case GL_DEBUG_SEVERITY_LOW_ARB:
+            return "-Low -:";
+        default:
+            return "-    -:";
+    }
+}
+
+void GLAPIENTRY gl_message_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam ) {
+    HYDRA_LOG( "%s - %s :%s\n", to_string_message_type(type), to_string_message_severity(severity), message );
+}
+
+void cache_resource_bindings( GLuint shader, const ResourceListLayoutGL* resource_set_layout ) {
 
     for ( uint32_t i = 0; i < resource_set_layout->num_bindings; i++ ) {
         ResourceBindingGL& binding = resource_set_layout->bindings[i];
@@ -1542,7 +1932,7 @@ void cache_resource_bindings( GLuint shader, const ResourceSetLayoutGL* resource
     }
 }
 
-// Testing
+// Testing //////////////////////////////////////////////////////////////////////
 void test_texture_creation( Device& device ) {
     TextureCreation first_rt = {};
     first_rt.width = 1;
@@ -1574,7 +1964,8 @@ void test_pool( Device & device ) {
     TextureHandle t1 = device.create_texture( texture_creation );
     TextureHandle t2 = device.create_texture( texture_creation );
 
-    const Texture* t1_info = device.query_texture( t1 );
+    TextureDescription t1_info;
+    device.query_texture( t1, t1_info );
 
     device.destroy_texture( t1 );
     device.destroy_texture( t0 );
@@ -1595,9 +1986,8 @@ void test_command_buffer( Device& device ) {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
-// Vulkan
-/////////////////////////////////////////////////////////////////////////////////
+// Vulkan ///////////////////////////////////////////////////////////////////////
+
 #elif defined (HYDRA_VULKAN)
 
 #define VULKAN_DEBUG_REPORT
