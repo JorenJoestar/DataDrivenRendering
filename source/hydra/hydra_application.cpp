@@ -82,7 +82,7 @@ void Application::main_loop() {
     ImGuiIO& io = ImGui::GetIO();
     ImVec4 clear_color = ImVec4( 0.45f, 0.05f, 0.00f, 1.00f );
 
-    hydra::graphics::CommandBuffer* ui_commands = gfx_device.create_command_buffer( hydra::graphics::QueueType::Graphics, 1024, false );
+    hydra::graphics::CommandBuffer* ui_commands = gfx_device.create_command_buffer( hydra::graphics::QueueType::Graphics, 1024 * 10, false );
 
     bool done = false;
     while ( !done )
