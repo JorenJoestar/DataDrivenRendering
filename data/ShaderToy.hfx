@@ -1,0 +1,20 @@
+shader ShaderToy {
+    // Setup all the conversion necessary to run ShaderToy shaders with minimal modifications.
+
+    layout {
+        list Main {
+            cbuffer ShaderToyConstants;
+        }
+    }
+    
+
+    glsl fragment_include {
+
+        layout (std140, binding=1) uniform ShaderToyConstants {
+
+            vec2 			iResolution;
+        	float 			iTime;
+        	float			iPad0;
+        };
+    }
+}

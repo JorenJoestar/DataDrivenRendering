@@ -2,7 +2,8 @@
 
 #include "Lexer.h"
 
-
+typedef hydra::StringRef StringRef;
+typedef hydra::StringBuffer StringBuffer;
 
 //
 // Define the language specific structures.
@@ -42,16 +43,16 @@ namespace hdf {
 
     }; // struct Parser
 
-    static void                         initParser( Parser* parser, Lexer* lexer, uint32_t max_types );
-    static void                         generateAST( Parser* parser );
+    static void                         init_parser( Parser* parser, Lexer* lexer, uint32_t max_types );
+    static void                         generate_ast( Parser* parser );
 
     static void                         identifier( Parser* parser, const Token& token );
     static const Type*                  findType( Parser* parser, const StringRef& name );
 
-    static void                         declarationStruct( Parser* parser );        // Follows the syntax 'struct name { (member)* };
-    static void                         declarationEnum( Parser* parser );
-    static void                         declarationCommand( Parser* parser );
-    static void                         declarationVariable( Parser* parser, const StringRef& type_name, Type& type );
+    static void                         declaration_struct( Parser* parser );        // Follows the syntax 'struct name { (member)* };
+    static void                         declaration_enum( Parser* parser );
+    static void                         declaration_command( Parser* parser );
+    static void                         declaration_variable( Parser* parser, const StringRef& type_name, Type& type );
 
     //
     // Given an AST the CodeGenerator will create the output code.
@@ -66,15 +67,15 @@ namespace hdf {
 
     }; // struct CodeGenerator
 
-    static void                         initCodeGenerator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size );
-    static void                         generateCode( CodeGenerator* code_generator, const char* filename );
+    static void                         init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size );
+    static void                         generate_code( CodeGenerator* code_generator, const char* filename );
 
-    static void                         outputCPPStruct( CodeGenerator* code_generator, FILE* output, const Type& type );
-    static void                         outputCPPEnum( CodeGenerator* code_generator, FILE* output, const Type& type );
-    static void                         outputCPPCommand( CodeGenerator* code_generator, FILE* output, const Type& type );
+    static void                         output_cpp_struct( CodeGenerator* code_generator, FILE* output, const Type& type );
+    static void                         output_cpp_enum( CodeGenerator* code_generator, FILE* output, const Type& type );
+    static void                         output_cpp_command( CodeGenerator* code_generator, FILE* output, const Type& type );
 
     //
-    // IMPLEMENTATION
+    // Implementation ///////////////////////////////////////////////////////////
     //
 
     //
@@ -82,7 +83,7 @@ namespace hdf {
     // Allocate the string in one contiguous - and add the string length as a prefix (like a run length encoding)
     static const char*          s_primitive_types_names = "6int32 7uint32 6int16 7uint16 5int8 6uint8 6int64 7uint64 6float 7double 5bool";
 
-    void initParser( Parser* parser, Lexer* lexer, uint32_t max_types ) {
+    void init_parser( Parser* parser, Lexer* lexer, uint32_t max_types ) {
 
         parser->lexer = lexer;
 
@@ -109,7 +110,9 @@ namespace hdf {
         }
     }
 
-    void generateAST( Parser* parser ) {
+    //
+    //
+    void generate_ast( Parser* parser ) {
 
         // Read source text until the end.
         // The main body can be a list of declarations.
@@ -118,7 +121,7 @@ namespace hdf {
         while ( parsing ) {
 
             Token token;
-            nextToken( parser->lexer, token );
+            next_token( parser->lexer, token );
 
             switch ( token.type ) {
 
@@ -137,13 +140,8 @@ namespace hdf {
         }
     }
 
-    static bool expectKeyword( const StringRef& text, uint32_t length, const char* expected_keyword ) {
-        if ( text.length != length )
-            return false;
-
-        return memcmp( text.text, expected_keyword, length ) == 0;
-    }
-
+    //
+    //
     inline void identifier( Parser* parser, const Token& token ) {
 
         // Scan the name to know which 
@@ -153,8 +151,8 @@ namespace hdf {
             switch ( c ) {
                 case 's':
                 {
-                    if ( expectKeyword( token.text, 6, "struct" ) ) {
-                        declarationStruct( parser );
+                    if ( expect_keyword( token.text, 6, "struct" ) ) {
+                        declaration_struct( parser );
                         return;
                     }
 
@@ -163,8 +161,8 @@ namespace hdf {
 
                 case 'e':
                 {
-                    if ( expectKeyword( token.text, 4, "enum" ) ) {
-                        declarationEnum( parser );
+                    if ( expect_keyword( token.text, 4, "enum" ) ) {
+                        declaration_enum( parser );
                         return;
                     }
                     break;
@@ -172,8 +170,8 @@ namespace hdf {
 
                 case 'c':
                 {
-                    if ( expectKeyword( token.text, 7, "command" ) ) {
-                        declarationCommand( parser );
+                    if ( expect_keyword( token.text, 7, "command" ) ) {
+                        declaration_command( parser );
                         return;
                     }
                     break;
@@ -182,6 +180,8 @@ namespace hdf {
         }
     }
 
+    //
+    //
     inline const Type* findType( Parser* parser, const StringRef& name ) {
 
         for ( uint32_t i = 0; i < parser->types_count; ++i ) {
@@ -193,17 +193,19 @@ namespace hdf {
         return nullptr;
     }
 
-    inline void declarationStruct( Parser* parser ) {
+    //
+    //
+    inline void declaration_struct( Parser* parser ) {
         // name
         Token token;
-        if ( !expectToken( parser->lexer, token, Token::Token_Identifier ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_Identifier ) ) {
             return;
         }
 
         // Cache name string
         StringRef name = token.text;
 
-        if ( !expectToken( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
             return;
         }
 
@@ -214,26 +216,28 @@ namespace hdf {
         type.exportable = true;
 
         // Parse struct internals
-        while ( !equalToken( parser->lexer, token, Token::Token_CloseBrace ) ) {
+        while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
 
             if ( token.type == Token::Token_Identifier ) {
-                declarationVariable( parser, token.text, type );
+                declaration_variable( parser, token.text, type );
             }
         }
     }
 
-    inline void declarationVariable( Parser* parser, const StringRef& type_name, Type& type ) {
+    //
+    //
+    inline void declaration_variable( Parser* parser, const StringRef& type_name, Type& type ) {
         const Type* variable_type = findType( parser, type_name );
         Token token;
         // Name
-        if ( !expectToken( parser->lexer, token, Token::Token_Identifier ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_Identifier ) ) {
             return;
         }
 
         // Cache name string
         StringRef name = token.text;
 
-        if ( !expectToken( parser->lexer, token, Token::Token_Semicolon ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_Semicolon ) ) {
             return;
         }
 
@@ -241,10 +245,12 @@ namespace hdf {
         type.names.emplace_back( name );
     }
 
-    inline void declarationEnum( Parser* parser ) {
+    //
+    //
+    inline void declaration_enum( Parser* parser ) {
         Token token;
         // Name
-        if ( !expectToken( parser->lexer, token, Token::Token_Identifier ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_Identifier ) ) {
             return;
         }
 
@@ -252,12 +258,12 @@ namespace hdf {
         StringRef name = token.text;
 
         // Optional ': type' for the enum
-        nextToken( parser->lexer, token );
+        next_token( parser->lexer, token );
         if ( token.type == Token::Token_Colon ) {
             // Skip to open brace
-            nextToken( parser->lexer, token );
+            next_token( parser->lexer, token );
             // Token now contains type_name
-            nextToken( parser->lexer, token );
+            next_token( parser->lexer, token );
             // Token now contains open brace.
         }
 
@@ -272,7 +278,7 @@ namespace hdf {
         type.exportable = true;
 
         // Parse struct internals
-        while ( !equalToken( parser->lexer, token, Token::Token_CloseBrace ) ) {
+        while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
 
             if ( token.type == Token::Token_Identifier ) {
                 type.names.emplace_back( token.text );
@@ -280,17 +286,19 @@ namespace hdf {
         }
     }
 
-    inline void declarationCommand( Parser* parser ) {
+    //
+    //
+    inline void declaration_command( Parser* parser ) {
         // name
         Token token;
-        if ( !expectToken( parser->lexer, token, Token::Token_Identifier ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_Identifier ) ) {
             return;
         }
 
         // Cache name string
         StringRef name = token.text;
 
-        if ( !expectToken( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
             return;
         }
 
@@ -301,7 +309,7 @@ namespace hdf {
         command_type.exportable = true;
 
         // Parse struct internals
-        while ( !equalToken( parser->lexer, token, Token::Token_CloseBrace ) ) {
+        while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
 
             if ( token.type == Token::Token_Identifier ) {
                 // Create a new type for each command
@@ -311,9 +319,9 @@ namespace hdf {
                 type.type = Type::Types_Struct;
                 type.exportable = false;
 
-                while ( !equalToken( parser->lexer, token, Token::Token_CloseBrace ) ) {
+                while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
                     if ( token.type == Token::Token_Identifier ) {
-                        declarationVariable( parser, token.text, type );
+                        declaration_variable( parser, token.text, type );
                     }
                 }
 
@@ -324,13 +332,15 @@ namespace hdf {
     }
 
     //
-    // CodeGenerator methods
+    // CodeGenerator methods ////////////////////////////////////////////////////
     //
 
     static const char* s_primitive_type_cpp[] = { "int32_t", "uint32_t", "int16_t", "uint16_t", "int8_t", "uint8_t", "int64_t", "uint64_t", "float", "double", "bool" };
     static const char* s_primitive_type_imgui[] = { "ImGuiDataType_S32", "ImGuiDataType_U32", "ImGuiDataType_S16", "ImGuiDataType_U16", "ImGuiDataType_S8", "ImGuiDataType_U8", "ImGuiDataType_S64", "ImGuiDataType_U64", "ImGuiDataType_Float", "ImGuiDataType_Double" };
 
-    inline void initCodeGenerator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size ) {
+    //
+    //
+    inline void init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size ) {
         code_generator->parser = parser;
 
         code_generator->string_buffer_0.init( buffer_size );
@@ -338,7 +348,9 @@ namespace hdf {
         code_generator->string_buffer_2.init( buffer_size );
     }
 
-    void generateCode( CodeGenerator* code_generator, const char* filename ) {
+    //
+    //
+    void generate_code( CodeGenerator* code_generator, const char* filename ) {
 
         // Create file
         FILE* output_file;
@@ -362,19 +374,19 @@ namespace hdf {
             switch ( type.type ) {
                 case Type::Types_Struct:
                 {
-                    outputCPPStruct( code_generator, output_file, type );
+                    output_cpp_struct( code_generator, output_file, type );
                     break;
                 }
 
                 case Type::Types_Enum:
                 {
-                    outputCPPEnum( code_generator, output_file, type );
+                    output_cpp_enum( code_generator, output_file, type );
                     break;
                 }
 
                 case Type::Types_Command:
                 {
-                    outputCPPCommand( code_generator, output_file, type );
+                    output_cpp_command( code_generator, output_file, type );
                     break;
                 }
             }
@@ -383,7 +395,9 @@ namespace hdf {
         fclose( output_file );
     }
 
-    void outputCPPStruct( CodeGenerator* code_generator, FILE* output, const Type& type ) {
+    //
+    //
+    void output_cpp_struct( CodeGenerator* code_generator, FILE* output, const Type& type ) {
         const char* tabs = "";
 
         code_generator->string_buffer_0.clear();
@@ -483,7 +497,9 @@ namespace hdf {
         fprintf( output, "\n%s}; // struct %s\n\n", tabs, name_buffer );
     }
 
-    void outputCPPEnum( CodeGenerator* code_generator, FILE* output, const Type& type ) {
+    //
+    //
+    void output_cpp_enum( CodeGenerator* code_generator, FILE* output, const Type& type ) {
 
         // Empty enum: skip output.
         if ( type.names.size() == 0 )
@@ -506,7 +522,7 @@ namespace hdf {
 
         // Enums with more than 1 values
         if ( type.names.size() > 1 ) {
-            const uint32_t max_values = type.names.size() - 1;
+            const uint32_t max_values = (uint32_t)type.names.size() - 1;
             for ( uint32_t v = 0; v < max_values; ++v ) {
 
                 if ( add_mask ) {
@@ -555,7 +571,7 @@ namespace hdf {
 
             if ( add_mask ) {
                 value_masks.append( ", Count_mask = 1 << " );
-                value_masks.append( _itoa( type.names.size(), name_buffer, 10 ) );
+                value_masks.append( _itoa( (int32_t)type.names.size(), name_buffer, 10 ) );
             }
         }
 
@@ -586,7 +602,9 @@ namespace hdf {
         fprintf( output, "} // namespace %s\n\n", name_buffer );
     }
 
-    void outputCPPCommand( CodeGenerator* code_generator, FILE* output, const Type& type ) {
+    //
+    //
+    void output_cpp_command( CodeGenerator* code_generator, FILE* output, const Type& type ) {
 
         char name_buffer[256], member_name_buffer[256], member_type_buffer[256];
         copy( type.name, name_buffer, 256 );
@@ -615,9 +633,9 @@ namespace hdf {
             copy( command_type.name, member_type_buffer, 256 );
             fprintf( output, "%sstruct %s {\n\n", tabs, member_type_buffer );
 
-            for ( int i = 0; i < command_type.types.size(); ++i ) {
-                const Type& member_type = *command_type.types[i];
-                const StringRef& member_name = command_type.names[i];
+            for ( int j = 0; j < command_type.types.size(); ++j ) {
+                const Type& member_type = *command_type.types[j];
+                const StringRef& member_name = command_type.names[j];
 
                 copy( member_name, member_name_buffer, 256 );
 

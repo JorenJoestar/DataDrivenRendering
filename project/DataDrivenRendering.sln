@@ -7,12 +7,18 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DataDrivenRendering", "Data
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_Vulkan|x64 = Debug_Vulkan|x64
 		Debug|x64 = Debug|x64
+		Release_Vulkan|x64 = Release_Vulkan|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug_Vulkan|x64.ActiveCfg = Debug_Vulkan|x64
+		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug_Vulkan|x64.Build.0 = Debug_Vulkan|x64
 		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug|x64.ActiveCfg = Debug|x64
 		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug|x64.Build.0 = Debug|x64
+		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release_Vulkan|x64.ActiveCfg = Release_Vulkan|x64
+		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release_Vulkan|x64.Build.0 = Release_Vulkan|x64
 		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release|x64.ActiveCfg = Release|x64
 		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

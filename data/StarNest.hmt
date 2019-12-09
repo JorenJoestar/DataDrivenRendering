@@ -1,0 +1,17 @@
+{
+    "name": "StarNest",
+    "effect_path": "StarNest.hfx",
+    "properties": [
+        {
+            "zoom": 3.0,
+            "tile": 0.8500000238418579
+        }
+    ],
+    "bindings": [
+        {
+            "LocalConstants": "LocalConstants",
+            "ShaderToyConstants": "ShaderToyConstants",
+            "input_texture": "pass0_output_texture"
+        }
+    ]
+}

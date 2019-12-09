@@ -1,0 +1,157 @@
+shader StarNest {
+
+    includes {
+        "ShaderToy.hfx"
+    }
+    
+    properties {
+
+        zoom("Zoom", Float) = 0.80
+        tile("Tile", Float) = 0.850
+    }
+
+    glsl Main {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+        out vec4 vTexCoord;
+
+        void main() {
+
+            vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+            vTexCoord.zw = vTexCoord.xy;
+
+            gl_Position = vec4(vTexCoord.xy * 2.0f + -1.0f, 0.0f, 1.0f);
+        }
+        #endif // VERTEX
+
+
+        #if defined FRAGMENT
+        // Star Nest by Pablo Roman Andrioli
+
+        // This content is under the MIT License.
+
+        #define iterations 17
+        #define formuparam 0.53
+
+        #define volsteps 20
+        #define stepsize 0.1
+
+        #define zoom   local_constants.zoom
+        #define tile   local_constants.tile
+        #define speed  0.010 
+
+        #define brightness 0.0015
+        #define darkmatter 0.300
+        #define distfading 0.730
+        #define saturation 0.850
+
+        #pragma include_hfx "ShaderToy.fragment_include"
+
+
+        in vec4 vTexCoord;
+        out vec4 outColor;
+
+
+        void mainImage( out vec4 fragColor, in vec2 fragCoord )
+        {
+            //get coords and direction
+            vec2 uv=fragCoord.xy/iResolution.xy-.5;
+            uv.y*=iResolution.y/iResolution.x;
+            vec3 dir=vec3(uv*zoom,1.);
+            float time=iTime*speed+.25;
+
+            //mouse rotation
+            float a1= 0.0f;//.5+iMouse.x/iResolution.x*2.;
+            float a2= 0.0f;// 8+iMouse.y/iResolution.y*2.;
+            
+            mat2 rot1=mat2(cos(a1),sin(a1),-sin(a1),cos(a1));
+            mat2 rot2=mat2(cos(a2),sin(a2),-sin(a2),cos(a2));
+            dir.xz*=rot1;
+            dir.xy*=rot2;
+            vec3 from=vec3(1.,.5,0.5);
+            from+=vec3(time*2.,time,-2.);
+            from.xz*=rot1;
+            from.xy*=rot2;
+            
+            //volumetric rendering
+            float s=0.1,fade=1.;
+            vec3 v=vec3(0.);
+            for (int r=0; r<volsteps; r++) {
+                vec3 p=from+s*dir*.5;
+                p = abs(vec3(tile)-mod(p,vec3(tile*2.))); // tiling fold
+                float pa,a=pa=0.;
+                for (int i=0; i<iterations; i++) { 
+                    p=abs(p)/dot(p,p)-formuparam; // the magic formula
+                    a+=abs(length(p)-pa); // absolute sum of average change
+                    pa=length(p);
+                }
+                float dm=max(0.,darkmatter-a*a*.001); //dark matter
+                a*=a*a; // add contrast
+                if (r>6) fade*=1.-dm; // dark matter, don't render near
+                //v+=vec3(dm,dm*.5,0.);
+                v+=fade;
+                v+=vec3(s,s*s,s*s*s*s)*a*brightness*fade; // coloring based on distance
+                fade*=distfading; // distance fading
+                s+=stepsize;
+            }
+            v=mix(vec3(length(v)),v,saturation); //color adjust
+            fragColor = vec4(v*.01,1.);    
+            
+        }
+
+        void main() {
+
+            mainImage( outColor, gl_FragCoord.xy );
+        }
+
+        #endif // FRAGMENT
+    }
+
+    glsl ToScreen {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+        out vec4 vTexCoord;
+
+        void main() {
+
+            vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+            vTexCoord.zw = vTexCoord.xy;
+
+            gl_Position = vec4(vTexCoord.xy * 2.0f + -1.0f, 0.0f, 1.0f);
+        }
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        in vec4 vTexCoord;
+
+        out vec4 outColor;
+
+        layout(binding=0) uniform sampler2D input_texture;
+
+        void main() {
+            vec3 color = texture2D(input_texture, vTexCoord.xy).xyz;
+            outColor = vec4(1, 1, 0, 1);
+            outColor = vec4(color, 1);
+        }
+        #endif // FRAGMENT
+    }
+
+    pipeline = ShaderToy
+
+    pass Main {
+        stage = final
+        resources = "ShaderToy.Main"
+        vertex = Main
+        fragment = Main
+    }
+
+}
+
+
+
+
