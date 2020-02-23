@@ -1,0 +1,289 @@
+shader PBR {
+
+    properties {
+        albedo_texture("Albedo", 2D) = ""
+        normals_texture("Normals", 2D) = ""
+        metal_roughness_texture("MetalRoughness", 2D) = ""
+        emissive_texture("Emissive", 2D) = ""
+        occlusion_texture("Occlusion", 2D) = ""
+        scale("Scale", Float) = 16.0
+    }
+
+    layout {
+        vertex main3D {
+            binding 0 16
+            attribute float3 Position 0 0 0 vertex
+            attribute ubyte4n Color 0 1 12 vertex
+        }
+
+        vertex main3DPosition {
+            binding 0 12
+            attribute float3 Position 0 0 0 vertex
+        }
+
+        vertex main3DPositionNormal {
+            binding 0 12
+            binding 1 12
+            binding 3 64
+            attribute float3 Position 0 0 0 vertex
+            attribute float3 Normal 1 1 0 vertex
+            attribute float4 InstanceTransform 3 3 0 instance
+            attribute float4 InstanceTransform 3 4 16 instance
+            attribute float4 InstanceTransform 3 5 32 instance
+            attribute float4 InstanceTransform 3 6 48 instance
+        }
+
+        vertex gbuffer {
+            binding 0 12
+            binding 1 12
+            binding 2 8
+            binding 3 64
+            attribute float3 Position 0 0 0 vertex
+            attribute float3 Normal 1 1 0 vertex
+            attribute float2 UV 2 2 0 vertex
+            attribute float4 InstanceTransform 3 3 0 instance
+            attribute float4 InstanceTransform 3 4 16 instance
+            attribute float4 InstanceTransform 3 5 32 instance
+            attribute float4 InstanceTransform 3 6 48 instance
+        }
+
+        list gbuffer {
+            cbuffer ViewConstants ViewConstants;
+
+            texture2D albedo;
+            texture2D normals;
+            texture2D metalRoughness;
+            texture2D emissive;
+            texture2D occlusion;
+
+            sampler2D linear_sampler
+        }
+    }
+
+    sampler_states {
+        state linear_sampler {
+            Filter MinMagMipLinear
+            AddressU Clamp
+            AddressV Clamp
+        }
+    }
+
+    render_states {
+        state main {
+            Cull Back
+            ZTest LEqual
+            ZWrite On
+        }
+
+        state linesZTest {
+            Cull None
+            ZTest LEqual
+            ZWrite Off
+            BlendMode Alpha
+        }
+    }
+
+    glsl GBuffer_V {
+
+        #pragma include "Platform.h"
+
+        layout (location = 0) in vec3 Position;
+        layout (location = 1) in vec3 Normal;
+        layout (location = 2) in vec2 UV;
+        layout (location = 3) in mat4 instanceTransform;
+
+        layout (std140, binding=0) uniform ViewConstants {
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        out vec3 vertexNormal;
+        out vec2 uv;
+        out vec3 worldPosition;
+
+        void main()
+        {
+            vertexNormal = (inverse(transpose((instanceTransform))) * vec4(Normal,0)).rgb;
+            uv = UV;
+
+            vec4 world_pos = instanceTransform * vec4(Position.xyz, 1.0f);
+            worldPosition = world_pos.xyz;
+            gl_Position = view_projection_matrix * world_pos;
+        }
+    }
+
+    glsl GBuffer_F {
+
+        #pragma include "Platform.h"
+    
+        layout (location = 0) out vec4 Out_Color;
+        layout (location = 1) out vec4 Out_Normals;
+        layout (location = 2) out vec4 Out_Properties0;
+        //layout (location = 3) out vec4 Out_WorldPosition;
+
+        layout(binding=0) uniform sampler2D albedo;
+        layout(binding=1) uniform sampler2D normals;
+        layout(binding=2) uniform sampler2D metalRoughness;
+        layout(binding=3) uniform sampler2D emissive;
+        layout(binding=4) uniform sampler2D occlusion;
+
+        in vec3 vertexNormal;
+        in vec2 uv;
+        in vec3 worldPosition;
+
+        void generate_TB_basis( out vec3 vT, out vec3 vB, vec2 texST, vec3 base_normal, vec3 sigma_x, vec3 sigma_y, float flip_sign )
+        {
+            vec2 dSTdx = dFdxFine ( texST ) , dSTdy = dFdyFine ( texST ) ;
+            float det = dot ( dSTdx , vec2 ( dSTdy .y ,- dSTdy .x ));
+            float sign_det = det <0 ? -1 : 1;
+
+            // invC0 represents ( dXds , dYds ) ; but we don ’t divide by
+            // determinant ( scale by sign instead )
+            vec2 invC0 = sign_det * vec2 ( dSTdy .y , - dSTdx .y );
+
+            vT = sigma_x * invC0 .x + sigma_y * invC0 .y;
+            if( abs ( det ) > 0.0)
+                vT = normalize ( vT );
+
+            vB = ( sign_det * flip_sign ) * cross ( base_normal , vT );
+        }
+
+        void main()
+        {
+            // Calculate gradient base:
+            vec3 base_normal = normalize(vertexNormal);
+
+            vec3 position_derivate_x = dFdxFine( worldPosition );
+            vec3 position_derivate_y = dFdyFine( worldPosition );
+
+            vec3 sigma_x = position_derivate_x - dot( position_derivate_x, base_normal ) * base_normal;
+            vec3 sigma_y = position_derivate_y - dot( position_derivate_y, base_normal ) * base_normal;
+            float flip_sign = dot ( position_derivate_y, cross ( base_normal, position_derivate_x )) < 0 ? -1 : 1;
+
+            vec3 tangent, bitangent;
+            generate_TB_basis( tangent, bitangent, uv.xy, base_normal, sigma_x, sigma_y, flip_sign );
+
+            vec3 tangent_normal = texture(normals, uv.xy).xyz * 2 - 1;
+
+            vec3 normal = tangent * tangent_normal.x + bitangent * tangent_normal.y + base_normal * tangent_normal.z;
+            normal = normalize(normal);
+
+            vec3 emissive_color = texture(emissive, uv.xy).rgb;
+
+            //Out_Normals = vec4(vertexNormal, 1);
+            //Out_Normals = vec4(tangent_normal * 0.5 + 0.5, 1);
+            Out_Normals = vec4(normal, emissive_color.r);
+
+            vec3 color = texture(albedo, uv.xy).xyz;
+            float occlusion = texture(occlusion, uv.xy).r;
+            Out_Color = vec4(color, occlusion);
+
+            // G = Rougthness, B = Metalness
+            vec2 roughness_metal = texture(metalRoughness, uv.xy).yz;
+            Out_Properties0 = vec4(roughness_metal.xy, emissive_color.gb);
+
+            // TODO: remove! This is to test world space reconstruction!
+            //Out_WorldPosition = vec4(worldPosition, 1);
+        }
+    }
+
+    glsl PositionOnly {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 Position;
+
+        uniform ViewConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        void main()
+        {
+            gl_Position = view_projection_matrix * vec4(Position.xyz, 1.0f);
+        }
+        out vec4 vTexCoord;
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) out vec4 Out_Color;
+        
+        void main()
+        {
+            Out_Color = vec4(1,1,1,1);
+        }
+        #endif // FRAGMENT
+    }
+
+    glsl PositionNormals {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 Position;
+        layout (location = 1) in vec3 Normal;
+        layout (location = 3) in mat4 instanceTransform;
+
+        layout (std140, binding=0) uniform ViewConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        out vec3 vertexNormal;
+
+        void main()
+        {
+            vertexNormal = Normal;
+            gl_Position = view_projection_matrix * instanceTransform * vec4(Position.xyz, 1.0f);
+        }
+        
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) out vec4 Out_Color;
+        layout (location = 1) out vec4 Out_Normals;
+        in vec3 vertexNormal;
+        
+        void main()
+        {
+            Out_Normals = vec4(vertexNormal * 0.5 + 0.5, 1);
+
+            vec3 L = vec3(-0.7, 0.7, 0 );
+            float lambert_diffuse = max(0, dot(vertexNormal, L));
+            Out_Color = vec4(lambert_diffuse.xxx, 1);
+        }
+        #endif // FRAGMENT
+    }
+
+    pass GBuffer {
+        resources = gbuffer
+        render_states = main
+        vertex_layout = gbuffer
+        vertex = GBuffer_V
+        fragment = GBuffer_F
+    }
+
+    pass PositionN {
+        render_states = main
+        vertex_layout = main3DPositionNormal
+        vertex = PositionNormals
+        fragment = PositionNormals
+    }
+
+    pass PositionOnly {
+        render_states = main
+        vertex_layout = main3DPosition
+        vertex = PositionOnly
+        fragment = PositionOnly
+    }
+}

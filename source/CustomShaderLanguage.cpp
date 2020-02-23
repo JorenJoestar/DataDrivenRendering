@@ -261,14 +261,14 @@ void CustomShaderLanguageApplication::manual_init_graphics() {
 
     commands->begin_submit( 0 );
     commands->bind_pipeline( first_compute_pipeline );
-    commands->bind_resource_list( &compute_resources, 1 );
+    commands->bind_resource_list( &compute_resources, 1, nullptr, 0 );
     commands->dispatch( first_rt.width / 32u, first_rt.height / 32u, 1 );
     commands->end_submit();
 
     commands->begin_submit( 1 );
     commands->bind_pipeline( first_graphics_pipeline );
-    commands->bind_resource_list( &gfx_resources, 1 );
-    commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer() );
+    commands->bind_resource_list( &gfx_resources, 1, nullptr, 0 );
+    commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer(), 0, 0 );
     commands->draw( graphics::TopologyType::Triangle, 0, 3 );
     commands->end_submit();
 }
@@ -279,7 +279,7 @@ static void compile_shader_effect_pass( hydra::graphics::Device& device, hfx::Sh
     using namespace hydra;
 
 
-    hfx::ShaderEffectFile::PassHeader* pass_header = hfx::get_pass( shader_effect_file, pass_index );
+    hfx::ShaderEffectFile::PassHeader* pass_header = hfx::get_pass( shader_effect_file.memory, pass_index );
     uint32_t shader_count = pass_header->num_shader_chunks;
 
     for ( uint16_t i = 0; i < shader_count; i++ ) {
@@ -341,7 +341,6 @@ void CustomShaderLanguageApplication::load_shader_effect() {
     // Pipelines
 
     // - Compute pipeline
-    compute_pipeline.compute = true;
     compute_pipeline.resource_list_layout[0] = compute_resource_layout;
     compute_pipeline.num_active_layouts = 1;
     graphics::PipelineHandle first_compute_pipeline = gfx_device.create_pipeline( compute_pipeline );
@@ -360,14 +359,14 @@ void CustomShaderLanguageApplication::load_shader_effect() {
 
     commands->begin_submit( 0 );
     commands->bind_pipeline( first_compute_pipeline );
-    commands->bind_resource_list( &compute_resources, 1 );
+    commands->bind_resource_list( &compute_resources, 1, nullptr, 0 );
     commands->dispatch( first_rt.width / 32u, first_rt.height / 32u, 1 );
     commands->end_submit();
 
     commands->begin_submit( 1 );
     commands->bind_pipeline( first_graphics_pipeline );
-    commands->bind_resource_list( &gfx_resources, 1 );
-    commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer() );
+    commands->bind_resource_list( &gfx_resources, 1, nullptr, 0 );
+    commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer(), 0, 0 );
     commands->draw( graphics::TopologyType::Triangle, 0, 3 );
     commands->end_submit();
 }
@@ -393,7 +392,7 @@ static void generate_shader_permutation( const char* filename, Lexer& lexer, hfx
     hfx::init_parser( &effect_parser, &lexer );
     hfx::generate_ast( &effect_parser );
 
-    hfx::init_code_generator( &hfx_code_generator, &effect_parser, 8000, 8 );
+    hfx::init_code_generator( &hfx_code_generator, &effect_parser, 8000, 8, filename );
     hfx::generate_shader_permutations( &hfx_code_generator, "..\\data\\" );
 }
 
@@ -407,7 +406,7 @@ static void compile_hfx( const char* filename, const char* out_filename, Lexer& 
     hfx::init_parser( &effect_parser, &lexer );
     hfx::generate_ast( &effect_parser );
 
-    hfx::init_code_generator( &hfx_code_generator, &effect_parser, 8000, 8 );
+    hfx::init_code_generator( &hfx_code_generator, &effect_parser, 8000, 8, filename );
     hfx::compile_shader_effect_file( &hfx_code_generator, "..\\data\\", out_filename );
 }
 

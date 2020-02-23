@@ -1,12 +1,5 @@
 //
-//  Hydra Graphics - v0.042
-//  3D API wrapper around Vulkan/Direct3D12/OpenGL.
-//  Mostly based on the amazing Sokol library (https://github.com/floooh/sokol), but with a different target (wrapping Vulkan/Direct3D12).
-//
-//      Source code     : https://www.github.com/jorenjoestar/
-//      Version         : 0.042
-//
-//
+//  Hydra Graphics - v0.044
 
 #include "hydra_graphics.h"
 
@@ -22,7 +15,6 @@
 #include "stb_leakcheck.h"
 
 // Defines //////////////////////////////////////////////////////////////////////
-
 
 // Use shared libraries to enhance different functions.
 #define HYDRA_LIB
@@ -282,9 +274,11 @@ void CommandBuffer::bind_pipeline( PipelineHandle handle ) {
     bind->handle = handle;
 }
 
-void CommandBuffer::bind_vertex_buffer( BufferHandle handle ) {
+void CommandBuffer::bind_vertex_buffer( BufferHandle handle, uint32_t binding, uint32_t offset ) {
     commands::BindVertexBuffer* bind = write_command< commands::BindVertexBuffer>();
     bind->buffer = handle;
+    bind->binding = binding;
+    bind->byte_offset = offset;
 }
 
 void CommandBuffer::bind_index_buffer( BufferHandle handle ) {
@@ -292,14 +286,19 @@ void CommandBuffer::bind_index_buffer( BufferHandle handle ) {
     bind->buffer = handle;
 }
 
-void CommandBuffer::bind_resource_list( ResourceListHandle* handle, uint32_t num_lists ) {
+void CommandBuffer::bind_resource_list( ResourceListHandle* handle, uint32_t num_lists, uint32_t* offsets, uint32_t num_offsets ) {
     commands::BindResourceList* bind = write_command<commands::BindResourceList>();
     
     for ( uint32_t l = 0; l < num_lists; ++l ) {
         bind->handles[l] = handle[l];
     }
 
+    for ( uint32_t l = 0; l < num_offsets; ++l ) {
+        bind->offsets[l] = offsets[l];
+    }
+
     bind->num_lists = num_lists;
+    bind->num_offsets = num_offsets;
 }
 
 void CommandBuffer::set_viewport( const Viewport& viewport ) {
@@ -320,12 +319,23 @@ void CommandBuffer::clear( float red, float green, float blue, float alpha ) {
     clear->clear_color[3] = alpha;
 }
 
-void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t count ) {
+void CommandBuffer::clear_depth( float value ) {
+    commands::ClearDepth* clear = write_command<commands::ClearDepth>();
+    clear->value = value;
+}
+
+void CommandBuffer::clear_stencil( uint8_t value ) {
+    commands::ClearStencil* clear = write_command<commands::ClearStencil>();
+    clear->value = value;
+}
+
+void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t count, uint32_t instance_count ) {
     commands::Draw* draw_command = write_command<commands::Draw>();
 
     draw_command->topology = topology;
     draw_command->first_vertex = start;
     draw_command->vertex_count = count;
+    draw_command->instance_count = instance_count;
 }
 
 void CommandBuffer::drawIndexed( TopologyType::Enum topology, uint32_t index_count, uint32_t instance_count,
@@ -833,7 +843,7 @@ static GLuint to_gl_mag_filter_type( TextureFilter::Enum filter ) {
 //
 // Minification filter conversion to GL values.
 //
-static GLuint to_gl_min_filter_type( TextureFilter::Enum filter, TextureFilter::Enum mipmap ) {
+static GLuint to_gl_min_filter_type( TextureFilter::Enum filter, TextureMipFilter::Enum mipmap ) {
     static GLuint s_gl_min_filter_type[4] = { GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_LINEAR };
     
     return s_gl_min_filter_type[(filter * 2) + mipmap];
@@ -900,19 +910,19 @@ static GLenum to_gl_blend_equation( BlendOperation::Enum blend ) {
 
 //
 //
-// Float, Float2, Float3, Float4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Count
+// Float, Float2, Float3, Float4, Mat4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Count
 static GLuint to_gl_components( VertexComponentFormat::Enum format ) {
-    static GLuint s_gl_components[] = { 1, 2, 3, 4, 1, 4, 1, 4, 2, 2, 4, 4 };
+    static GLuint s_gl_components[] = { 1, 2, 3, 4, 16, 1, 4, 1, 4, 2, 2, 4, 4 };
     return s_gl_components[format];
 }
 
 static GLenum to_gl_vertex_type( VertexComponentFormat::Enum format ) {
-    static GLenum s_gl_vertex_type[] = { GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_BYTE, GL_BYTE, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_SHORT, GL_SHORT, GL_SHORT, GL_SHORT };
+    static GLenum s_gl_vertex_type[] = { GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_FLOAT, GL_BYTE, GL_BYTE, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_SHORT, GL_SHORT, GL_SHORT, GL_SHORT };
     return s_gl_vertex_type[format];
 }
 
 static GLboolean to_gl_vertex_norm( VertexComponentFormat::Enum format ) {
-    static GLboolean s_gl_vertex_norm[] = { GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE };
+    static GLboolean s_gl_vertex_norm[] = { GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE };
     return s_gl_vertex_norm[format];
 }
 
@@ -943,7 +953,6 @@ struct BufferGL {
     GLuint                          gl_handle           = 0;
     GLuint                          gl_type             = 0;
     GLuint                          gl_usage            = 0;
-    GLuint                          gl_vao_handle       = 0;        // Special case for Vertex Arrays. They need both this AND a buffer.
 
 }; // struct BufferGL
 
@@ -987,6 +996,7 @@ struct PipelineGL {
 
     ShaderHandle                    shader_state;
     GLuint                          gl_program_cached   = 0;
+    GLuint                          gl_vao              = 0;
 
     const ResourceListLayoutGL*     resource_list_layout[k_max_resource_layouts];
     ResourceListLayoutHandle        resource_list_layout_handle[k_max_resource_layouts];
@@ -1005,6 +1015,8 @@ struct PipelineGL {
 //
 //
 struct SamplerGL {
+
+    SamplerCreation                 creation;
 
 }; // struct SamplerGL
 
@@ -1064,7 +1076,7 @@ struct ResourceListGL {
     uint32_t                        num_resources       = 0;
 
 
-    void                            set() const;
+    void                            set( const uint32_t* offsets, uint32_t num_offsets ) const;
 
 }; // struct ResourceListGL
 
@@ -1073,18 +1085,32 @@ struct ResourceListGL {
 struct DeviceStateGL {
 
     GLuint                          fbo_handle          = 0;
-    GLuint                          vb_handle           = 0;
-    GLuint                          vao_handle          = 0;
     GLuint                          ib_handle           = 0;
+
+    struct VertexBufferBinding {
+        GLuint                      vb_handle;
+        uint32_t                    binding;
+        uint32_t                    offset;
+    };
+
+    VertexBufferBinding             vb_bindings[8];
+    uint32_t                        num_vertex_streams = 0;
 
     const Viewport*                 viewport            = nullptr;
     const Rect2D*                   scissor             = nullptr;
     const PipelineGL*               pipeline            = nullptr;
     const ResourceListGL*           resource_lists[k_max_resource_layouts];
+    uint32_t                        resource_offsets[k_max_resource_layouts];
     uint32_t                        num_lists           = 0;
+    uint32_t                        num_offsets         = 0;
 
     float                           clear_color[4];
+    float                           clear_depth_value;
+    uint8_t                         clear_stencil_value;
     bool                            clear_color_flag    = false;
+    bool                            clear_depth_flag    = false;
+    bool                            clear_stencil_flag  = false;
+
     bool                            swapchain_flag      = false;
     bool                            end_pass_flag       = false;    // End pass after last draw/dispatch.
 
@@ -1095,9 +1121,9 @@ struct DeviceStateGL {
 // Methods //////////////////////////////////////////////////////////////////////
 
 // Forward declarations
-static GLuint                       compile_shader( GLuint stage, const char* source );
-static bool                         get_compile_info( GLuint shader, GLuint status );
-static bool                         get_link_info( GLuint shader, GLuint status );
+static GLuint                       compile_shader( GLuint stage, const char* source, const char* shader_name );
+static bool                         get_compile_info( GLuint shader, GLuint status, const char* shader_name );
+static bool                         get_link_info( GLuint shader, GLuint status, const char* shader_name );
 
 static void                         create_fbo( const RenderPassCreation& creation, RenderPassGL& fbo, Device& device );
 
@@ -1135,6 +1161,7 @@ void Device::backend_init( const DeviceCreation& creation ) {
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE );
 
     device_state = (DeviceStateGL*)malloc( sizeof( DeviceStateGL ) );
+    memset( device_state, 0, sizeof( DeviceStateGL ) );
 
 #if defined (HYDRA_GRAPHICS_TEST)
     test_texture_creation( *this );
@@ -1249,6 +1276,22 @@ const RenderPassGL* Device::access_render_pass( RenderPassHandle render_pass ) c
     return (const RenderPassGL*)render_passes.access_resource( render_pass.handle );
 }
 
+void Device::link_texture_sampler( TextureHandle texture, SamplerHandle sampler ) {
+
+    TextureGL* texture_gl = access_texture( texture );
+    SamplerGL* sampler_gl = access_sampler( sampler );
+
+    glBindTexture( texture_gl->gl_target, texture_gl->gl_handle );
+
+    glTexParameteri( texture_gl->gl_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR );//GL_LINEAR_MIPMAP_LINEAR to_gl_min_filter_type( sampler_gl->creation.min_filter, sampler_gl->creation.mip_filter ) );
+    glTexParameteri( texture_gl->gl_target, GL_TEXTURE_MAG_FILTER, to_gl_mag_filter_type( sampler_gl->creation.mag_filter ) );
+
+    glBindTexture( texture_gl->gl_target, 0 );
+
+    //glTextureParameteri( texture_gl->gl_handle, GL_TEXTURE_MIN_FILTER, to_gl_min_filter_type(sampler_gl->creation.min_filter, sampler_gl->creation.mip_filter) );
+    //glTextureParameteri( texture_gl->gl_handle, GL_TEXTURE_MAG_FILTER, to_gl_mag_filter_type( sampler_gl->creation.mag_filter ) );
+}
+
 // Resource Creation ////////////////////////////////////////////////////////////
 TextureHandle Device::create_texture( const TextureCreation& creation ) {
 
@@ -1342,7 +1385,7 @@ ShaderHandle Device::create_shader( const ShaderCreation& creation ) {
 
     for ( compiled_shaders = 0; compiled_shaders < creation.stages_count; ++compiled_shaders ) {
         const ShaderCreation::Stage& stage = creation.stages[compiled_shaders];
-        GLuint gl_shader = compile_shader( to_gl_shader_stage(stage.type), stage.code );
+        GLuint gl_shader = compile_shader( to_gl_shader_stage(stage.type), stage.code, creation.name );
 
         if ( !gl_shader ) {
             break;
@@ -1360,13 +1403,11 @@ ShaderHandle Device::create_shader( const ShaderCreation& creation ) {
 
         glLinkProgram( gl_program );
 
-        if ( !get_link_info( gl_program, GL_LINK_STATUS ) ) {
+        if ( !get_link_info( gl_program, GL_LINK_STATUS, creation.name ) ) {
             glDeleteProgram( gl_program );
             gl_program = 0;
 
             creation_failed = true;
-
-            HYDRA_LOG( "Error linking GL shader %s.\n", creation.name );
         }
 
         ShaderStateGL* shader_state = access_shader( handle );
@@ -1377,6 +1418,13 @@ ShaderHandle Device::create_shader( const ShaderCreation& creation ) {
     if ( creation_failed ) {
         shaders.release_resource( handle.handle );
         handle.handle = k_invalid_handle;
+
+        // Dump shader code
+        HYDRA_LOG( "Error in creation of shader %s. Dumping all shader informations.\n", creation.name );
+        for ( compiled_shaders = 0; compiled_shaders < creation.stages_count; ++compiled_shaders ) {
+            const ShaderCreation::Stage& stage = creation.stages[compiled_shaders];
+            HYDRA_LOG("%s:\n%s\n", ShaderStage::ToString(stage.type), stage.code);
+        }
     }
 
     return handle;
@@ -1405,8 +1453,17 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
     pipeline->shader_state = shader_state;
     pipeline->gl_program_cached = shader_state_data->gl_program;
     pipeline->handle = handle;
+    pipeline->graphics_pipeline = true;
 
-    if ( !creation.compute ) {
+
+    for ( size_t i = 0; i < creation.shaders.stages_count; ++i ) {
+        if ( creation.shaders.stages[i].type == ShaderStage::Compute ) {
+            pipeline->graphics_pipeline = false;
+            break;
+        }
+    }
+
+    if ( pipeline->graphics_pipeline ) {
         // Copy render states from creation
         pipeline->depth_stencil = creation.depth_stencil;
         pipeline->blend_state = creation.blend_state;
@@ -1422,10 +1479,20 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
         memcpy( vertex_input.vertex_streams, vertex_input_creation.vertex_streams, vertex_input_creation.num_vertex_streams * sizeof( VertexStream ) );
         memcpy( vertex_input.vertex_attributes, vertex_input_creation.vertex_attributes, vertex_input_creation.num_vertex_attributes * sizeof( VertexAttribute ) );
 
-        pipeline->graphics_pipeline = true;
-    }
-    else {
-        pipeline->graphics_pipeline = false;
+        glCreateVertexArrays( 1, &pipeline->gl_vao );
+        glBindVertexArray( pipeline->gl_vao );
+
+        for ( uint32_t i = 0; i < vertex_input.num_attributes; i++ ) {
+            const VertexAttribute& attribute = vertex_input.vertex_attributes[i];
+            glEnableVertexAttribArray( attribute.location );
+            glVertexAttribFormat( attribute.location, to_gl_components( attribute.format ), to_gl_vertex_type( attribute.format ),
+                                  to_gl_vertex_norm( attribute.format ), attribute.offset );
+            glVertexAttribBinding( attribute.location, attribute.binding );
+
+            glVertexBindingDivisor( attribute.binding, attribute.input_rate == VertexInputRate::PerVertex ? 0 : 1 );
+        }
+
+        glBindVertexArray( 0 );
     }
 
     // Resource List Layout
@@ -1437,7 +1504,7 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
     }
 
     if ( creation.num_active_layouts == 0 ) {
-        print_format( "Error in pipeline: no resources layouts are specificed!" );
+        print_format( "Error in pipeline: no resources layouts are specificed!\n" );
     }
 
     return handle;
@@ -1473,11 +1540,8 @@ BufferHandle Device::create_buffer( const BufferCreation& creation ) {
 
         case BufferType::Vertex:
         {
-            // Create both a buffer AND a vertex array object.
             glCreateBuffers( 1, &buffer->gl_handle );
             glNamedBufferData( buffer->gl_handle, buffer->size, creation.initial_data, buffer->gl_usage );
-
-            glCreateVertexArrays( 1, &buffer->gl_vao_handle );
 
             break;
         }
@@ -1506,6 +1570,8 @@ SamplerHandle Device::create_sampler( const SamplerCreation& creation ) {
         return handle;
     }
 
+    SamplerGL* sampler = access_sampler( handle );
+    sampler->creation = creation;
 
     return handle;
 }
@@ -1601,6 +1667,7 @@ RenderPassHandle Device::create_render_pass( const RenderPassCreation& creation 
     render_pass->clear_color = false;
     render_pass->fullscreen = false;
     render_pass->num_render_targets = 0;
+    render_pass->depth_stencil = nullptr;
 
     // Create the FBO only if it actually outputs to textures.
     // Compute post-processes and framebuffer passes do not output to FBOs in OpenGL.
@@ -1777,6 +1844,37 @@ void Device::unmap_buffer( const MapBufferParameters& parameters ) {
 }
 
 // Other methods ////////////////////////////////////////////////////////////////
+
+static void resize_texture( TextureGL* texture , uint16_t width, uint16_t height ) {
+
+    const GLuint gl_internal_format = to_gl_internal_format( texture->format );
+    const GLuint gl_format = to_gl_format( texture->format );
+    const GLuint gl_type = to_gl_format_type( texture->format );
+
+    glBindTexture( texture->gl_target, texture->gl_handle );
+
+    switch ( texture->type ) {
+        case TextureType::Texture2D:
+        {
+            GLint level = 0;
+            GLint border = 0;
+            glTexImage2D( texture->gl_target, level, gl_internal_format, width, height, border, gl_format, gl_type, 0 );
+            break;
+        }
+
+        default:
+        {
+            break;
+        }
+    }
+
+    // Update texture informations
+    texture->width = width;
+    texture->height = height;
+
+    glBindTexture( texture->gl_target, 0 );
+}
+
 void Device::resize_output_textures( RenderPassHandle render_pass, uint16_t width, uint16_t height ) {
 
     RenderPassGL* render_pass_gl = access_render_pass( render_pass );
@@ -1784,28 +1882,12 @@ void Device::resize_output_textures( RenderPassHandle render_pass, uint16_t widt
 
         for ( size_t i = 0; i < render_pass_gl->num_render_targets; ++i ) {
             TextureGL* texture = render_pass_gl->render_targets[i];
-            const GLuint gl_internal_format = to_gl_internal_format( texture->format );
-            const GLuint gl_format = to_gl_format( texture->format );
-            const GLuint gl_type = to_gl_format_type( texture->format );
+            resize_texture( texture, width, height );
+        }
 
-            glBindTexture( texture->gl_target, texture->gl_handle );
-
-            switch ( texture->type ) {
-                case TextureType::Texture2D:
-                {
-                    GLint level = 0;
-                    GLint border = 0;
-                    glTexImage2D( texture->gl_target, level, gl_internal_format, width, height, border, gl_format, gl_type, 0 );
-                    break;
-                }
-
-                default:
-                {
-                    break;
-                }
-            }
-
-            glBindTexture( texture->gl_target, 0 );
+        if ( render_pass_gl->depth_stencil ) {
+            TextureGL* texture = render_pass_gl->depth_stencil;
+            resize_texture( texture, width, height );
         }
     }
 }
@@ -1892,8 +1974,10 @@ void Device::present() {
                     const commands::BindVertexBuffer& binding = command_buffer.read_command<commands::BindVertexBuffer>();
                     BufferGL* buffer = access_buffer( binding.buffer );
 
-                    device_state->vao_handle = buffer->gl_vao_handle;
-                    device_state->vb_handle = buffer->gl_handle;
+                    DeviceStateGL::VertexBufferBinding& vb_binding = device_state->vb_bindings[device_state->num_vertex_streams++];
+                    vb_binding.vb_handle = buffer->gl_handle;
+                    vb_binding.offset = binding.byte_offset;
+                    vb_binding.binding = binding.binding;
 
                     break;
                 }
@@ -1933,6 +2017,24 @@ void Device::present() {
                     break;
                 }
 
+                case CommandType::ClearDepth:
+                {
+                    const commands::ClearDepth& clear = command_buffer.read_command<commands::ClearDepth>();
+                    device_state->clear_depth_value = clear.value;
+                    device_state->clear_depth_flag = true;
+
+                    break;
+                }
+
+                case CommandType::ClearStencil:
+                {
+                    const commands::ClearStencil& clear = command_buffer.read_command<commands::ClearStencil>();
+                    device_state->clear_stencil_value = clear.value;
+                    device_state->clear_stencil_flag = true;
+
+                    break;
+                }
+
                 case CommandType::BindPipeline:
                 {
                     const commands::BindPipeline& binding = command_buffer.read_command<commands::BindPipeline>();
@@ -1953,6 +2055,12 @@ void Device::present() {
                     }
 
                     device_state->num_lists = binding.num_lists;
+
+                    for ( uint32_t l = 0; l < binding.num_offsets; ++l ) {
+                        device_state->resource_offsets[l] = binding.offsets[l];
+                    }
+
+                    device_state->num_offsets = binding.num_offsets;
 
                     break;
                 }
@@ -1975,7 +2083,12 @@ void Device::present() {
                     device_state->apply();
 
                     const commands::Draw& draw = command_buffer.read_command<commands::Draw>();
-                    glDrawArrays( GL_TRIANGLES, draw.first_vertex, draw.vertex_count );
+                    if ( draw.instance_count ) {
+                        glDrawArraysInstanced( GL_TRIANGLES, draw.first_vertex, draw.vertex_count, draw.instance_count );
+                    }
+                    else {
+                        glDrawArrays( GL_TRIANGLES, draw.first_vertex, draw.vertex_count );
+                    }
 
                     break;
                 }
@@ -1987,9 +2100,14 @@ void Device::present() {
                     const commands::DrawIndexed& draw = command_buffer.read_command<commands::DrawIndexed>();
                     const uint32_t index_buffer_size = 2;
                     const GLuint start = 0;
-                    const GLuint start_index_offset = draw.first_index * index_buffer_size;
-                    const GLuint end_index_offset = start_index_offset + draw.index_count * index_buffer_size;
-                    glDrawRangeElementsBaseVertex( GL_TRIANGLES, start_index_offset, end_index_offset, (GLsizei)draw.index_count, GL_UNSIGNED_SHORT, (void*)start_index_offset, draw.vertex_offset );
+                    const GLuint start_index_offset = draw.first_index;
+                    const GLuint end_index_offset = start_index_offset + draw.index_count;
+                    if ( draw.instance_count ) {
+                        glDrawElementsInstancedBaseVertexBaseInstance( GL_TRIANGLES, (GLsizei)draw.index_count, GL_UNSIGNED_SHORT, (void*)( start_index_offset * index_buffer_size ), draw.instance_count, draw.vertex_offset, draw.first_instance );
+                    }
+                    else {
+                        glDrawRangeElementsBaseVertex( GL_TRIANGLES, start_index_offset, end_index_offset, (GLsizei)draw.index_count, GL_UNSIGNED_SHORT, (void*)( start_index_offset * index_buffer_size ), draw.vertex_offset );
+                    }
                     
                     break;
                 }
@@ -2009,13 +2127,15 @@ void Device::present() {
 
 // ResourceListGL ///////////////////////////////////////////////////////////////
 
-void ResourceListGL::set() const {
+void ResourceListGL::set( const uint32_t* offsets, uint32_t num_offsets ) const {
 
     if ( layout == nullptr ) {
         return;
     }
 
-    // TODO: this is the first version. Just sets textures.
+    // Track current constant buffer index. Used to retrieve offsets.
+    uint32_t c = 0;
+
     for ( uint32_t r = 0; r < layout->num_bindings; ++r ) {
         const ResourceBindingGL& binding = layout->bindings[r];
 
@@ -2044,14 +2164,20 @@ void ResourceListGL::set() const {
             case ResourceType::Constants:
             {
                 const BufferGL* buffer = (const BufferGL*)resources[r].data;
-                glBindBufferBase( buffer->gl_type, binding.gl_block_binding, buffer->gl_handle );
+                const GLuint buffer_offset = 0;// num_offsets ? offsets[c] : 0;
+                const GLsizei buffer_size = buffer->size;// num_offsets ? 64 : buffer->size;
+                //int align;
+                //glGetIntegerv( GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &align );
+                glBindBufferRange( buffer->gl_type, binding.gl_block_binding, buffer->gl_handle, buffer_offset, buffer_size );
+
+                ++c;
 
                 break;
             }
 
             default:
             {
-                HYDRA_ASSERT( false, "Resource type not handled, %u" );
+                //HYDRA_ASSERT( false, "Resource type not handled, %u" );
                 break;
             }
         }
@@ -2062,24 +2188,22 @@ void ResourceListGL::set() const {
 void DeviceStateGL::apply()  {
 
     if ( pipeline->graphics_pipeline ) {
+
         // Bind FrameBuffer
         if ( !swapchain_flag && fbo_handle > 0 ) {
             glBindFramebuffer( GL_FRAMEBUFFER, fbo_handle );
         }
 
-        // Bind Vertex Buffer
-        glBindBuffer( GL_ARRAY_BUFFER, vb_handle );
-        glBindVertexArray( vao_handle );
-
-        // Bind Index Buffer
-        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ib_handle );
-
-        if ( viewport )
+        if ( viewport ) {
             glViewport( viewport->rect.x, viewport->rect.y, viewport->rect.width, viewport->rect.height );
+        }
 
         if ( scissor ) {
             glEnable( GL_SCISSOR_TEST );
             glScissor( scissor->x, scissor->y, scissor->width, scissor->height );
+        }
+        else {
+            glDisable( GL_SCISSOR_TEST );
         }
 
         // Bind shaders
@@ -2087,11 +2211,9 @@ void DeviceStateGL::apply()  {
 
         if ( num_lists ) {
             for ( uint32_t l = 0; l < num_lists; ++l ) {
-                resource_lists[l]->set();
+                resource_lists[l]->set( resource_offsets, num_offsets );
             }
-        }    
-
-        glDisable( GL_SCISSOR_TEST );
+        }
 
         // Set depth
         if ( pipeline->depth_stencil.depth_enable ) {
@@ -2112,9 +2234,26 @@ void DeviceStateGL::apply()  {
             glDisable( GL_STENCIL_TEST );
         }
 
-        if ( clear_color_flag ) {
+        if ( clear_color_flag || clear_depth_flag || clear_stencil_flag ) {
             glClearColor( clear_color[0], clear_color[1], clear_color[2], clear_color[3] );
-            glClear( GL_COLOR_BUFFER_BIT );
+
+            // TODO[gabriel]: single color mask enabling/disabling.
+            GLuint clear_mask = GL_COLOR_BUFFER_BIT;
+            clear_mask = clear_depth_flag ? clear_mask | GL_DEPTH_BUFFER_BIT : clear_mask;
+            clear_mask = clear_stencil_flag ? clear_mask | GL_STENCIL_BUFFER_BIT : clear_mask;
+
+            if ( clear_depth_flag ) {
+                glClearDepth( clear_depth_value );
+            }
+
+            if ( clear_stencil_flag ) {
+                glClearStencil( clear_stencil_value );
+            }
+
+            glClear( clear_mask );
+
+            // TODO: use this version instead ?
+            //glClearBufferfv( GL_COLOR, col_buff_index, &rgba );
         }
 
         // Set blend
@@ -2143,27 +2282,30 @@ void DeviceStateGL::apply()  {
         }
         else {
             glEnable( GL_CULL_FACE );
-            glFrontFace( rasterization.cull_mode == CullMode::Front ? GL_FRONT : GL_BACK );
+            glCullFace( rasterization.cull_mode == CullMode::Front ? GL_FRONT : GL_BACK );
         }
 
         glFrontFace( rasterization.front == FrontClockwise::True ? GL_CW : GL_CCW );
 
+        // Bind vertex array, containing vertex attributes.
+        glBindVertexArray( pipeline->gl_vao );
+
+        // Bind Index Buffer
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ib_handle );
+
+        // Bind Vertex Buffers with offsets.
         const VertexInputGL& vertex_input = pipeline->vertex_input;
         for ( uint32_t i = 0; i < vertex_input.num_streams; i++ ) {
             const VertexStream& stream = vertex_input.vertex_streams[i];
-            glBindVertexBuffer( stream.binding, vb_handle, 0, stream.stride );
-        }
 
-        for ( uint32_t i = 0; i < vertex_input.num_attributes; i++ ) {
-            const VertexAttribute& attribute = vertex_input.vertex_attributes[i];
-            glEnableVertexAttribArray( attribute.location );
-            glVertexAttribFormat( attribute.location, to_gl_components( attribute.format ), to_gl_vertex_type( attribute.format ),
-                                  to_gl_vertex_norm( attribute.format ), attribute.offset );
-            glVertexAttribBinding( attribute.location, attribute.binding );
+            glBindVertexBuffer( stream.binding, vb_bindings[i].vb_handle, vb_bindings[i].offset, stream.stride );
         }
 
         // Reset cached states
         clear_color_flag = false;
+        clear_depth_flag = false;
+        clear_stencil_flag = false;
+        num_vertex_streams = 0;
     }
     else {
 
@@ -2171,7 +2313,7 @@ void DeviceStateGL::apply()  {
 
         if ( num_lists ) {
             for ( uint32_t l = 0; l < num_lists; ++l ) {
-                resource_lists[l]->set();
+                resource_lists[l]->set( resource_offsets, num_offsets );
             }
         }
     }
@@ -2205,37 +2347,7 @@ void create_fbo( const RenderPassCreation& creation, RenderPassGL& render_pass, 
     GLuint framebuffer_handle;
     glGenFramebuffers(1, &framebuffer_handle );
 
-    // init depth
-    //glgen..
-    //glBindRenderbuffer( GL30.GL_RENDERBUFFER, depthbufferHandle );
-    //glRenderbufferStorage( GL30.GL_RENDERBUFFER, GL30.GL_DEPTH_COMPONENT, width, height );
-
-    //glBindRenderbuffer( GL30.GL_RENDERBUFFER, stencilbufferHandle );
-    //glRenderbufferStorage( GL30.GL_RENDERBUFFER, GL30.GL_STENCIL_INDEX8, width, height );
-
-    //depthStencilPackedBufferHandle = glGenRenderbuffers();
-    //hasDepthStencilPackedBuffer = true;
-    //glBindRenderbuffer( GL30.GL_RENDERBUFFER, depthStencilPackedBufferHandle );
-    //glRenderbufferStorage( GL30.GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height );
-    //glBindRenderbuffer( GL30.GL_RENDERBUFFER, 0 );
-
-    //glFramebufferRenderbuffer( GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT, GL30.GL_RENDERBUFFER, depthStencilPackedBufferHandle );
-    //glFramebufferRenderbuffer( GL30.GL_FRAMEBUFFER, GL30.GL_STENCIL_ATTACHMENT, GL30.GL_RENDERBUFFER, depthStencilPackedBufferHandle );
-
-    //glBindRenderbuffer( GL30.GL_RENDERBUFFER, 0 );
-    //glBindTexture( GL30.GL_TEXTURE_2D, 0 );
-
     int result = glCheckFramebufferStatus( GL_FRAMEBUFFER );
-
-    //if ( result == GL30.GL_FRAMEBUFFER_UNSUPPORTED && hasDepth && hasStencil
-    //     && (Gdx.graphics.supportsExtension( "GL_OES_packed_depth_stencil" ) ||
-    //          Gdx.graphics.supportsExtension( "GL_EXT_packed_depth_stencil" )) ) {
-
-    //    deleteDepthStencil();
-
-    //    initPackedDepthStencil();
-    //    result = glCheckFramebufferStatus( GL30.GL_FRAMEBUFFER );
-    //}
 
     if ( result != GL_FRAMEBUFFER_COMPLETE ) {
     //    deleteDepthStencil();
@@ -2255,18 +2367,9 @@ void create_fbo( const RenderPassCreation& creation, RenderPassGL& render_pass, 
     else {
 
         glBindFramebuffer( GL_FRAMEBUFFER, framebuffer_handle );
-
-    //    if ( hasDepth ) {
-    //        glFramebufferRenderbuffer( GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT, GL30.GL_RENDERBUFFER, depthbufferHandle );
-    //    }
-    //    if ( hasStencil ) {
-    //        glFramebufferRenderbuffer( GL30.GL_FRAMEBUFFER, GL30.GL_STENCIL_ATTACHMENT, GL30.GL_RENDERBUFFER, stencilbufferHandle );
-    //    }
     }
 
     // Attach textures
-    
-    //drawBuffers = BufferUtils.newIntBuffer( textures.size );
     render_pass.num_render_targets = creation.num_render_targets;
 
     for ( uint16_t i = 0; i < creation.num_render_targets; ++i ) {
@@ -2292,30 +2395,72 @@ void create_fbo( const RenderPassCreation& creation, RenderPassGL& render_pass, 
         if ( !checkFrameBuffer() ) {
             HYDRA_LOG( "Error" );
         }
-
-    //    drawBuffers.put( toGLColorAttachment( i ) );
     }
 
-    //if ( depthTexture != null ) {
-    //    int textureHandle = depthTexture.getTextureObjectHandle();
-    //    glBindTexture( depthTexture.glTarget, textureHandle );
+    // TODO: if textures are not any input in the pipeline, they could become Render Buffer Objects - faster to render to.
+    // Attach depth/stencil
+    render_pass.depth_stencil = nullptr;
 
-    //    if ( (depthTexture.glTarget == GL_TEXTURE_CUBE_MAP) || (depthTexture.glTarget == GL_TEXTURE_CUBE_MAP_ARRAY) ) {
-    //        glFramebufferTexture( GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT, textureHandle, 0 );
-    //    }
-    //    else {
-    //        glFramebufferTexture2D( GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_ATTACHMENT, depthTexture.glTarget, textureHandle, 0 );
-    //    }
+    if ( creation.depth_stencil_texture.handle != k_invalid_handle ) {
+        TextureGL* texture = device.access_texture( creation.depth_stencil_texture );
 
-    //    checkFrameBuffer();
-    //}
+        render_pass.depth_stencil = texture;
+
+        if ( texture ) {
+
+            glBindTexture( texture->gl_target, texture->gl_handle );
+
+            const bool depth_stencil = is_depth_stencil( texture->format );
+            const bool only_depth = is_depth_only( texture->format );
+            const bool only_stencil = is_stencil_only( texture->format );
+
+            if ( (texture->gl_target == GL_TEXTURE_CUBE_MAP) || (texture->gl_target == GL_TEXTURE_CUBE_MAP_ARRAY) ) {
+
+                if ( depth_stencil ) {
+                    glFramebufferTexture( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->gl_handle, 0 );
+                }
+                else {
+                    if ( only_depth ) {
+                        glFramebufferTexture( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->gl_handle, 0 );
+                    }
+
+                    if ( only_stencil ) {
+                        glFramebufferTexture( GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, texture->gl_handle, 0 );
+                    }
+                }
+
+            }
+            else {
+                if ( depth_stencil ) {
+                    glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->gl_target, texture->gl_handle, 0 );
+                }
+                else {
+                    if ( only_depth ) {
+                        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->gl_target, texture->gl_handle, 0 );
+                    }
+
+                    if ( only_stencil ) {
+                        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->gl_target, texture->gl_handle, 0 );
+                    }
+                }
+            }
+
+            if ( !checkFrameBuffer() ) {
+                HYDRA_LOG( "Error" );
+            }
+        }
+    }
+
+    const GLuint draw_buffers[8] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6, GL_COLOR_ATTACHMENT7 };
+    glDrawBuffers( creation.num_render_targets, draw_buffers );
+
     render_pass.fbo_handle = framebuffer_handle;
 
     glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
 }
 
-GLuint compile_shader( GLuint stage, const char* source ) {
+GLuint compile_shader( GLuint stage, const char* source, const char* shader_name ) {
     GLuint shader = glCreateShader( stage );
     if ( !shader ) {
         HYDRA_LOG( "Error creating GL shader.\n" );
@@ -2326,7 +2471,7 @@ GLuint compile_shader( GLuint stage, const char* source ) {
     glShaderSource( shader, 1, &source, 0 );
     glCompileShader( shader );
 
-    if ( !get_compile_info( shader, GL_COMPILE_STATUS ) ) {
+    if ( !get_compile_info( shader, GL_COMPILE_STATUS, shader_name ) ) {
         glDeleteShader( shader );
         shader = 0;
 
@@ -2336,7 +2481,7 @@ GLuint compile_shader( GLuint stage, const char* source ) {
     return shader;
 }
 
-bool get_compile_info( GLuint shader, GLuint status ) {
+bool get_compile_info( GLuint shader, GLuint status, const char* shader_name ) {
     GLint result;
     // Status is either compile (for shaders) or link (for programs).
     glGetShaderiv( shader, status, &result );
@@ -2346,7 +2491,7 @@ bool get_compile_info( GLuint shader, GLuint status ) {
         glGetShaderiv( shader, GL_INFO_LOG_LENGTH, &info_log_length );
         if ( info_log_length > 0 ) {
             glGetShaderInfoLog( shader, s_string_buffer.buffer_size, &info_log_length, s_string_buffer.data );
-            HYDRA_LOG( "%s\n", s_string_buffer.data );
+            HYDRA_LOG( "Error compiling shader %s\n%s\n", shader_name, s_string_buffer.data );
         }
         return false;
     }
@@ -2354,7 +2499,7 @@ bool get_compile_info( GLuint shader, GLuint status ) {
     return true;
 }
 
-bool get_link_info( GLuint program, GLuint status ) {
+bool get_link_info( GLuint program, GLuint status, const char* shader_name ) {
     GLint result;
     // Status is either compile (for shaders) or link (for programs).
     glGetProgramiv( program, status, &result );
@@ -2364,7 +2509,7 @@ bool get_link_info( GLuint program, GLuint status ) {
         glGetProgramiv( program, GL_INFO_LOG_LENGTH, &info_log_length );
         if ( info_log_length > 0 ) {
             glGetShaderInfoLog( program, s_string_buffer.buffer_size, &info_log_length, s_string_buffer.data );
-            HYDRA_LOG( "%s\n", s_string_buffer.data );
+            HYDRA_LOG( "Error linking shader %s\n%s\n", shader_name, s_string_buffer.data );
         }
         return false;
     }
@@ -3090,5 +3235,5 @@ static_assert(false, "No platform was selected!");
 #endif // HYDRA_VULKAN
 
 
-} // namespace gfx_device
+} // namespace graphics
 } // namespace hydra

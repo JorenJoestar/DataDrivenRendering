@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 //
-// Hydra Lib - v0.02
+// Hydra Lib - v0.03
 //
 // Simple general functions for log, file, process, time.
 //
@@ -13,6 +13,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.03 (2019/12/17) + Interface cleanup. + Added array init macro.
 //      0.02 (2019/09/26) added stb.
 //      0.01 (2019/06/20) initial implementation.
 //
@@ -51,6 +52,9 @@ using Buffer                        = uint8_t*;
 // STB Macro embellishment //////////////////////////////////////////////////////
 
 // Array /////////////////////////////////
+#define array(Type)                 Type*
+
+#define array_init(variable)        variable = nullptr;
 #define array_free                  arrfree
 #define array_length                arrlen
 #define array_length_u              arrlenu
@@ -66,6 +70,8 @@ using Buffer                        = uint8_t*;
 #define array_max                   arrcap
 
 // Hash Map //////////////////////////////
+#define hash_map(Type)              Type*
+
 #define hash_map_free               hmfree
 #define hash_map_length             hmlen
 #define hash_map_length_u           hmlenu
@@ -79,6 +85,8 @@ using Buffer                        = uint8_t*;
 #define hash_map_delete             hmdel
 
 // String Hash Map ///////////////////////
+#define string_hash(Type)           Type*
+
 #define string_hash_init_arena      sh_new_arena
 #define string_hash_init_dynamic    sh_new_strdup
 #define string_hash_free            shfree

@@ -1,0 +1,52 @@
+{
+    "name": "Material_MR",
+    "effect_path": "PBR.hfx",
+    "bindings": [
+        {
+            "name": "ViewConstants",
+            "resource_name": "CB_Lines"
+        },
+        {
+            "name": "Transform",
+            "resource_name": "Transform"
+        },
+        {
+            "name": "albedo",
+            "sampler": "linear",
+            "resource_name": "albedo_texture"
+        },
+        {
+            "name": "normals",
+            "sampler": "linear",
+            "resource_name": "normals_texture"
+        },
+        {
+            "name": "metalRoughness",
+            "sampler": "linear",
+            "resource_name": "metal_roughness_texture"
+        },
+        {
+            "name": "emissive",
+            "sampler": "linear",
+            "resource_name": "emissive_texture"
+        },
+        {
+            "name": "linear_sampler",
+            "resource_name": "linear"
+        },
+        {
+            "name": "occlusion",
+            "sampler": "linear",
+            "resource_name": "occlusion_texture"
+        }
+    ],
+    "properties": [
+        {
+            "albedo_texture": "GLTF/DamagedHelmet/Default_albedo.jpg",
+            "normals_texture": "GLTF/DamagedHelmet/Default_normal.jpg",
+            "metal_roughness_texture": "GLTF/DamagedHelmet/Default_metalRoughness.jpg",
+            "emissive_texture": "GLTF/DamagedHelmet/Default_emissive.jpg",
+            "occlusion_texture": "GLTF/DamagedHelmet/Default_AO.jpg"
+        }
+    ]
+}

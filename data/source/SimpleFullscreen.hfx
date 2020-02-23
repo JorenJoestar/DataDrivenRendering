@@ -1,0 +1,336 @@
+shader SimpleFullscreen {
+
+    // For the artist
+    properties {
+
+        // Using Unity ShaderLab syntax:
+        // AORemapMin0("AORemapMin0", Range(0.0, 1.0)) = 0.0
+        scale("Scale", Float) = 16.0
+        albedo("Albedo", 2D) = ""
+        modulo("Modulo", Float) = 2.0
+    }
+
+    // For the developer
+    layout {
+        list LocalCompute {
+            cbuffer LocalConstants local_constants;
+            texture2D albedo_texture;
+
+            texture2Drw rgba8 destination_texture;
+        }
+
+        list Local {
+            texture2D input_texture;
+        }
+
+        list DeferredCompute {
+            cbuffer LightingConstants LightingConstants;
+
+            texture2D gbuffer_albedo
+            texture2D gbuffer_normals
+            texture2D gbuffer_properties0
+            texture2D depth_texture
+
+            texture2Drw rgba8 destination_texture;
+        }
+    }
+    
+    glsl ComputeTest {
+
+        #pragma include "Platform.h"
+
+        layout(binding=1) uniform sampler2D albedo_texture;
+
+        layout(rgba8, binding=0) writeonly uniform image2D destination_texture;
+
+        layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+        void main() {
+
+            ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+            // Returns a checkerboard pattern:
+            vec2 scaled_pos = ceil(gl_GlobalInvocationID.xy / local_constants.scale);
+            float color = mod(scaled_pos.x + scaled_pos.y, local_constants.modulo);
+            
+            ivec2 texture_pos = ivec2(pos.x, pos.y);
+            
+            vec4 albedo = texelFetch(albedo_texture, texture_pos, 0);
+
+            imageStore(destination_texture, pos, vec4(albedo.rgb, 1));
+        }
+    }
+
+    glsl DeferredCompute {
+
+        #pragma include "Platform.h"
+        #pragma include "math.h"
+        #pragma include "brdf.h"
+
+        // MATH /////////////////////////////////////////////////////////////////
+        
+        #define MIN_N_DOT_V 1e-4
+
+        float clampNoV( float NoV ) {
+            // Neubelt and Pettineo 2013, "Crafting a Next-gen Material Pipeline for The Order: 1886"
+            return max( NoV, MIN_N_DOT_V );
+        }
+
+        vec3 computeDiffuseColor( const vec4 baseColor, float metallic ) {
+            return baseColor.rgb * (1.0 - metallic);
+        }
+
+        vec3 computeF0( const vec4 baseColor, float metallic, float reflectance ) {
+            return baseColor.rgb * metallic + (reflectance * (1.0 - metallic));
+        }
+
+        float computeDielectricF0( float reflectance ) {
+            return 0.16 * reflectance * reflectance;
+        }
+
+        float perceptualRoughnessToRoughness( float perceptualRoughness ) {
+            return perceptualRoughness * perceptualRoughness;
+        }
+
+
+        float computeMicroShadowing( float NoL, float visibility ) {
+            // Chan 2018, "Material Advances in Call of Duty: WWII"
+            float aperture = inversesqrt( 1.0 - visibility );
+            float microShadow = saturate( NoL * aperture );
+            return microShadow * microShadow;
+        }
+
+
+        // Light attenuation ////////////////////////////////////////////////////////////
+        float getSquareFalloffAttenuation(float distanceSquare, float falloff) {
+            float factor = distanceSquare * falloff;
+            float smoothFactor = saturate(1.0 - factor * factor);
+            // We would normally divide by the square distance here
+            // but we do it at the call site
+            return smoothFactor * smoothFactor;
+        }
+
+        float getDistanceAttenuation(const highp vec3 posToLight, float falloff) {
+            float distanceSquare = dot(posToLight, posToLight);
+            float attenuation = getSquareFalloffAttenuation(distanceSquare, falloff);
+            // Assume a punctual light occupies a volume of 1cm to avoid a division by 0
+            return attenuation * 1.0 / max(distanceSquare, 1e-4);
+        }
+
+
+        // Depth ////////////////////////////////////////////////////////////////////////
+
+        vec3 WorldPositionFromDepth( vec2 uv, float raw_depth, mat4 inverse_view_projection ) {
+
+            vec4 H = vec4( uv * 2 - 1, raw_depth * 2 - 1, 1 );
+            vec4 D = inverse_view_projection * H;
+
+            return D.xyz / D.w;
+        }
+
+        // BRDF /////////////////////////////////////////////////////////////////
+        
+        float Fd_Lambert() {
+            return 1.0 / PI;
+        }
+
+        
+        float D_GGX( float roughness, float NoH, const vec3 h ) {
+            // Walter et al. 2007, "Microfacet Models for Refraction through Rough Surfaces"
+            float oneMinusNoHSquared = 1.0 - NoH * NoH;
+
+            float a = NoH * roughness;
+            float k = roughness / (oneMinusNoHSquared + a * a);
+            float d = k * k * (1.0 / PI);
+            return saturateMediump( d );
+        }
+
+        float V_SmithGGXCorrelated( float roughness, float NoV, float NoL ) {
+            // Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"
+            float a2 = roughness * roughness;
+            // TODO: lambdaV can be pre-computed for all the lights, it should be moved out of this function
+            float lambdaV = NoL * sqrt( (NoV - a2 * NoV) * NoV + a2 );
+            float lambdaL = NoV * sqrt( (NoL - a2 * NoL) * NoL + a2 );
+            float v = 0.5 / (lambdaV + lambdaL);
+            // a2=0 => v = 1 / 4*NoL*NoV   => min=1/4, max=+inf
+            // a2=1 => v = 1 / 2*(NoL+NoV) => min=1/4, max=+inf
+            // clamp to the maximum value representable in mediump
+            return saturateMediump( v );
+        }
+
+        
+        vec3 F_Schlick( const vec3 f0, float f90, float LoH ) {
+            // Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"
+            return f0 + (f90 - f0) * pow5( 1.0 - LoH );
+        }
+
+
+        // Shader ///////////////////////////////////////////////////////////////
+        
+
+        layout(binding=1) uniform sampler2D gbuffer_albedo;
+        layout(binding=2) uniform sampler2D gbuffer_normals;
+        layout(binding=3) uniform sampler2D gbuffer_properties0;
+        layout(binding=4) uniform sampler2D depth_texture;
+
+        layout(rgba16f, binding=0) writeonly uniform image2D destination_texture;
+
+        layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+        layout (std140, binding=0) uniform LightingConstants {
+            vec3                    directional_light;
+            uint                    use_point_light;
+
+            vec3                    camera_position;
+            float                   pad1;
+
+            vec2                    depth_constants;
+            vec2                    resolution_rcp;
+
+            vec3                    point_light_position;
+            float                   point_light_intensity;
+
+            mat4                    inverse_view_projection;
+        };
+
+        void main() {
+
+            ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+            ivec2 texture_pos = ivec2(pos.x, pos.y);
+            
+            vec4 albedo = texelFetch(gbuffer_albedo, texture_pos, 0);
+            vec4 normal_emissive_red = texelFetch(gbuffer_normals, texture_pos, 0);
+            vec3 n = normal_emissive_red.rgb;
+            vec4 roughness_metal = texelFetch(gbuffer_properties0, texture_pos, 0);
+            vec3 emissive_color = vec3(normal_emissive_red.w, roughness_metal.zw);
+
+            // Read depth
+            float raw_depth = texelFetch( depth_texture, texture_pos, 0 ).r;
+
+            // Reconstruct world position from depth
+            vec3 world_position = WorldPositionFromDepth( texture_pos * resolution_rcp, raw_depth, inverse_view_projection);
+
+            vec3 v = normalize(camera_position - world_position);
+            vec3 l = directional_light;
+
+            vec3 position_to_light = point_light_position - world_position;
+            l = use_point_light > 0 ? normalize(position_to_light) : l;
+
+            float attenuation = use_point_light > 0 ? getDistanceAttenuation(position_to_light, 0) : 1;
+
+            vec3 h = normalize(v + l);
+
+            float NoV = clampNoV(dot(n, v));
+            float NoL = clamp(dot(n, l), 0.0, 1.0);
+            float NoH = clamp(dot(n, h), 0.0, 1.0);
+            float LoH = clamp(dot(l, h), 0.0, 1.0);
+
+            // Albedo.a contains baked ambient occlusion
+            float occlusion = computeMicroShadowing( NoL, albedo.a );
+
+            float perceptualRoughness = clamp(roughness_metal.x, 0.01, 1.0);
+            float roughness = perceptualRoughnessToRoughness(perceptualRoughness);
+            float metallic = roughness_metal.y;
+
+            float reflectance = 0.5f;
+            reflectance = computeDielectricF0(reflectance);
+
+            vec3 f0 = computeF0( albedo, metallic, reflectance );
+
+            float D = D_GGX( roughness, NoH, h );
+            float V = V_SmithGGXCorrelated( roughness, NoV, NoL );
+            float f90 = saturate( dot( f0, vec3( 50.0 * 0.33 ) ) );
+            vec3 F = F_Schlick( f0, f90, LoH );
+
+            // specular BRDF
+            vec3 Fr = (D * V) * F;
+
+            // diffuse BRDF
+            vec3 diffuseColor = (1.0 - metallic) * albedo.rgb;
+
+            vec3 Fd = diffuseColor * Fd_Lambert();
+            
+            vec3 lighting = NoL * albedo.rgb;
+            lighting = Fd + Fr;
+            lighting *= NoL * attenuation * point_light_intensity * occlusion;
+
+            //lighting = vec3(1,0,0);
+
+            lighting += emissive_color;
+
+            imageStore(destination_texture, pos, vec4(lighting.rgb, 1));
+        }
+    }
+
+    glsl ToScreen {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+        out vec4 vTexCoord;
+
+        void main() {
+
+            vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+            vTexCoord.zw = vTexCoord.xy;
+
+            gl_Position = vec4(vTexCoord.xy * 2.0f + -1.0f, 0.0f, 1.0f);
+        }
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        in vec4 vTexCoord;
+
+        out vec4 outColor;
+
+        layout(binding=0) uniform sampler2D input_texture;
+
+        void main() {
+            vec3 color = texture2D(input_texture, vTexCoord.xy).xyz;
+            outColor = vec4(1, 1, 0, 1);
+            outColor = vec4(color, 1);
+        }
+        #endif // FRAGMENT
+    }
+
+    pipeline = computeTest
+
+    pass FillTexture {
+        dispatch = 32, 32, 1
+        stage = compute0
+        resources = LocalCompute
+        compute = ComputeTest
+    }
+
+    pass ToScreen {
+        stage = final
+        resources = Local
+        vertex = ToScreen
+        fragment = ToScreen
+    }
+
+    pass DeferredCompute {
+        dispatch = 32, 32, 1
+        resources = DeferredCompute
+        compute = DeferredCompute
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

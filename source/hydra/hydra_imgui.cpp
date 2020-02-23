@@ -40,50 +40,23 @@ bool hydra_Imgui_Init( hydra::graphics::Device& graphics_device ) {
     io.Fonts->TexID = (ImTextureID)&g_font_texture;
 
     // Compile shader
-    hfx::compile_hfx( "..\\data\\ImGui.hfx", "..\\data\\", "ImGui.bhfx" );
+    hfx::compile_hfx( "..\\data\\source\\ImGui.hfx", "..\\data\\bin\\", "ImGui.bhfx" );
 
     // Create shader
     hfx::ShaderEffectFile shader_effect_file;
-    hfx::init_shader_effect_file( shader_effect_file, "..\\data\\ImGui.bhfx" );
+    hfx::init_shader_effect_file( shader_effect_file, "..\\data\\bin\\ImGui.bhfx" );
 
-    hfx::ShaderEffectFile::PassHeader* pass_header = hfx::get_pass( shader_effect_file, 0 );
+    hfx::ShaderEffectFile::PassHeader* pass_header = hfx::get_pass( shader_effect_file.memory, 0 );
     uint32_t shader_count = pass_header->num_shader_chunks;
 
     PipelineCreation pipeline_creation = {};
 
-    ShaderCreation& shader_creation = pipeline_creation.shaders;
-    for ( uint16_t i = 0; i < shader_count; i++ ) {
-        hfx::get_shader_creation( pass_header, i, &shader_creation.stages[i] );
-    }
-
-    shader_creation.name = "ImGui_Shader";
-    shader_creation.stages_count = shader_count;
+    hfx::get_pipeline( pass_header, pipeline_creation);
 
     uint8_t num_bindings = 0;
     const hydra::graphics::ResourceListLayoutCreation::Binding* bindings = hfx::get_pass_layout_bindings( pass_header, 0, num_bindings );
     ResourceListLayoutCreation resource_layout_creation = { bindings, num_bindings };
     g_resource_layout = graphics_device.create_resource_list_layout( resource_layout_creation );
-
-
-    // Create pipeline
-    // Setup vertex buffer
-    VertexStream vertex_stream = { 0, sizeof( ImDrawVert ), VertexInputRate::PerVertex };
-    // Setup vertex attributes
-    VertexAttribute vertex_attributes[] = { { 0, 0, 0, VertexComponentFormat::Float2 },
-                                            { 1, 0, 8, VertexComponentFormat::Float2},
-                                            { 2, 0, 16, VertexComponentFormat::UByte4N } };
-
-    
-    pipeline_creation.vertex_input = { 1, 3, &vertex_stream, vertex_attributes };
-
-    pipeline_creation.depth_stencil.depth_enable = 0;
-    pipeline_creation.depth_stencil.stencil_enable = 0;
-
-    pipeline_creation.blend_state.active_states = 1;
-    pipeline_creation.blend_state.blend_states[0].blend_enabled = 1;
-    pipeline_creation.blend_state.blend_states[0].color_operation = BlendOperation::Add;
-    pipeline_creation.blend_state.blend_states[0].source_color = Blend::SrcAlpha;
-    pipeline_creation.blend_state.blend_states[0].destination_color = Blend::InvSrcAlpha;
 
     pipeline_creation.resource_list_layout[0] = g_resource_layout;
     pipeline_creation.num_active_layouts = 1;
@@ -203,7 +176,7 @@ void hydra_imgui_collect_draw_data( ImDrawData* draw_data, hydra::graphics::Devi
     }
 
     commands.bind_pipeline( g_imgui_pipeline );
-    commands.bind_vertex_buffer( g_vb );
+    commands.bind_vertex_buffer( g_vb, 0, 0 );
     commands.bind_index_buffer( g_ib );
 
     const Viewport viewport = { 0, 0, (float)fb_width, (float)fb_height, 0.0f, 1.0f };
@@ -241,7 +214,7 @@ void hydra_imgui_collect_draw_data( ImDrawData* draw_data, hydra::graphics::Devi
     TextureHandle last_texture = g_font_texture;
     ResourceListHandle last_resource_list = { hash_map_get( g_texture_to_resource_list, last_texture.handle ) };
 
-    commands.bind_resource_list( &last_resource_list, 1 );
+    commands.bind_resource_list( &last_resource_list, 1, nullptr, 0 );
 
     size_t vtx_buffer_offset = 0, idx_buffer_offset = 0;
     for ( int n = 0; n < counts; n++ )
@@ -290,7 +263,7 @@ void hydra_imgui_collect_draw_data( ImDrawData* draw_data, hydra::graphics::Devi
                             last_resource_list = gfx_device.create_resource_list( rl_creation );
                             hash_map_put( g_texture_to_resource_list, new_texture.handle, last_resource_list.handle );
                         }
-                        commands.bind_resource_list( &last_resource_list, 1 );
+                        commands.bind_resource_list( &last_resource_list, 1, nullptr, 0 );
                     }
 
                     const uint32_t start_index_offset = idx_buffer_offset * sizeof( ImDrawIdx );

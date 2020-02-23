@@ -1,0 +1,19 @@
+{
+    "name": "Lines",
+    "effect_path": "Lines.hfx",
+    "properties": [
+        {
+            
+        }
+    ],
+    "bindings": [
+        {
+            "name": "LocalConstants",
+            "resource_name": "CB_Lines"
+        },
+        {
+            "name": "Transform",
+            "resource_name": "Transform"
+        }
+    ]
+}

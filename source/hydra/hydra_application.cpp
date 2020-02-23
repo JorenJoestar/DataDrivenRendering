@@ -100,8 +100,11 @@ void Application::main_loop() {
                         case SDL_WINDOWEVENT_SIZE_CHANGED:
                         case SDL_WINDOWEVENT_RESIZED:
                         {
-                            gfx_device.resize( event.window.data1, event.window.data2 );
-                            app_resize( event.window.data1, event.window.data2 );
+                            uint16_t new_width = event.window.data1 % 2 == 0 ? event.window.data1 : event.window.data1 - 1;
+                            uint16_t new_height = event.window.data2 % 2 == 0 ? event.window.data2 : event.window.data2 - 1;
+
+                            gfx_device.resize( new_width, new_height );
+                            app_resize( new_width, new_height );
 
                             break;
                         }
@@ -113,6 +116,7 @@ void Application::main_loop() {
                         }
                     }
                 }
+
             }
         }
 
@@ -121,18 +125,11 @@ void Application::main_loop() {
         ImGui_ImplSDL2_NewFrame( window );
         ImGui::NewFrame();
 
-        //ui_commands->set_viewport( { 0, 0, io.DisplaySize.x, io.DisplaySize.y, 0.0f, 1.0f } );
-        //ui_commands->clear( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
-
         app_render( ui_commands );
-            
+
         // Rendering
         ImGui::Render();
         SDL_GL_MakeCurrent( window, gl_context );
-
-        //glViewport( 0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y );
-        //glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
-        //glClear( GL_COLOR_BUFFER_BIT );
 
         hydra_imgui_collect_draw_data( ImGui::GetDrawData(), gfx_device, *ui_commands );
 

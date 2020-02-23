@@ -1,6 +1,14 @@
 #include "ShaderCodeGenerator.h"
 
+
+// Defines ///////////////////////////////
+//
+// Use shared libraries to enhance different functions.
 #include "hydra/hydra_lib.h"
+
+#define HYDRA_LOG                                           hydra::print_format
+#define HYDRA_ASSERT( condition, message, ... )             assert( condition )
+
 
 namespace hfx {
 
@@ -67,6 +75,10 @@ void identifier( Parser* parser, const Token& token ) {
                     declaration_shader( parser );
                     return;
                 }
+                else if ( expect_keyword( token.text, 14, "sampler_states" ) ) {
+                    declaration_sampler_states( parser );
+                    return;
+                }
 
                 break;
             }
@@ -116,7 +128,14 @@ void identifier( Parser* parser, const Token& token ) {
                 break;
             }
 
-
+            case 'r':
+            {
+                if ( expect_keyword( token.text, 13, "render_states" ) ) {
+                    declaration_render_states( parser );
+                    return;
+                }
+                break;
+            }
         }
     }
 }
@@ -149,6 +168,9 @@ void pass_identifier( Parser* parser, const Token& token, Pass& pass ) {
                     pass.shader_stages.emplace_back( stage );
                     return;
                 }
+                else if ( expect_keyword( token.text, 13, "vertex_layout" ) ) {
+                    declaration_pass_vertex_layout( parser, pass );
+                }
                 break;
             }
 
@@ -168,6 +190,10 @@ void pass_identifier( Parser* parser, const Token& token, Pass& pass ) {
             {
                 if ( expect_keyword( token.text, 9, "resources" ) ) {
                     declaration_pass_resources( parser, pass );
+                    return;
+                }
+                else if ( expect_keyword( token.text, 13, "render_states" ) ) {
+                    declaration_pass_render_states( parser, pass );
                     return;
                 }
                 break;
@@ -280,7 +306,10 @@ void directive_identifier( Parser* parser, const Token& token, CodeFragment& cod
     }
 }
 
+//
+//
 void uniform_identifier( Parser* parser, const Token& token, CodeFragment& code_fragment ) {
+
     for ( uint32_t i = 0; i < token.text.length; ++i ) {
         char c = *(token.text.text + i);
 
@@ -317,6 +346,7 @@ void uniform_identifier( Parser* parser, const Token& token, CodeFragment& code_
 //
 //
 Property::Type property_type_identifier( const Token& token ) {
+
     for ( uint32_t i = 0; i < token.text.length; ++i ) {
         char c = *(token.text.text + i);
 
@@ -416,8 +446,6 @@ void resource_binding_identifier( Parser* parser, const Token& token, ResourceBi
 
                     flags = find_property( parser, other_token.text ) ? 1 : 0;
 
-                    next_token( parser->lexer, other_token );
-
                     return;
                 }
                 break;
@@ -455,8 +483,163 @@ void resource_binding_identifier( Parser* parser, const Token& token, ResourceBi
 
                 break;
             }
+
+            case 's':
+            {
+                if ( expect_keyword( token.text, 9, "sampler2D" ) ) {
+                    binding.type = hydra::graphics::ResourceType::Sampler;
+                    binding.start = 0;
+                    binding.count = 1;
+
+                    next_token( parser->lexer, other_token );
+
+                    copy( other_token.text, binding.name, 32 );
+
+                    flags = find_property( parser, other_token.text ) ? 1 : 0;
+
+                    return;
+                }
+                break;
+            }
         }
     }
+}
+
+//
+//
+void vertex_attribute_identifier( Parser* parser, Token& token, hydra::graphics::VertexAttribute& attribute ) {
+    
+    attribute.format = hydra::graphics::VertexComponentFormat::Count;
+
+    // Parse Type
+    for ( uint32_t i = 0; i < token.text.length; ++i ) {
+        char c = *(token.text.text + i);
+
+        switch ( c ) {
+            case 'f':
+            {
+                if ( expect_keyword( token.text, 6, "float4" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Float4;
+                }
+                else if ( expect_keyword( token.text, 6, "float3" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Float3;
+                }
+                else if ( expect_keyword( token.text, 6, "float2" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Float2;
+                }
+                else if ( expect_keyword( token.text, 5, "float" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Float;
+                }
+
+                break;
+            }
+
+            case 'b':
+            {
+                if ( expect_keyword( token.text, 4, "byte" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Byte;
+                }
+                else if ( expect_keyword( token.text, 6, "byte4n" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Byte4N;
+                }
+
+                break;
+            }
+
+            case 'u':
+            {
+                if ( expect_keyword( token.text, 5, "ubyte" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::UByte;
+                }
+                else if ( expect_keyword( token.text, 7, "ubyte4n" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::UByte4N;
+                }
+
+                break;
+            }
+
+            case 's':
+            {
+                if ( expect_keyword( token.text, 6, "short2" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Short2;
+                }
+                else if ( expect_keyword( token.text, 7, "short2n" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Short2N;
+                }
+                else if ( expect_keyword( token.text, 6, "short4" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Short4;
+                }
+                else if ( expect_keyword( token.text, 7, "short4n" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Short4N;
+                }
+
+                break;
+            }
+
+            case 'm':
+            {
+                if ( expect_keyword( token.text, 4, "mat4" ) ) {
+                    attribute.format = hydra::graphics::VertexComponentFormat::Mat4;
+                }
+            }
+
+        }
+    }
+
+    if ( attribute.format == hydra::graphics::VertexComponentFormat::Count ) {
+        // Error format not found!
+    }
+
+    // Goto next token
+    next_token( parser->lexer, token );
+    // Skip name
+    next_token( parser->lexer, token );
+    // Parse binding
+    uint32_t data_index = parser->lexer->data_buffer->current_entries - 1;
+    float value;
+    get_data( *parser->lexer->data_buffer, data_index, value );
+
+    attribute.binding = (uint16_t)value;
+
+    next_token( parser->lexer, token );
+
+    // Parse location
+    data_index = parser->lexer->data_buffer->current_entries - 1;
+    get_data( *parser->lexer->data_buffer, data_index, value );
+
+    attribute.location = (uint16_t)value;
+
+    next_token( parser->lexer, token );
+    // Parse offset
+    data_index = parser->lexer->data_buffer->current_entries - 1;
+    get_data( *parser->lexer->data_buffer, data_index, value );
+
+    attribute.offset = (uint16_t)value;
+
+    // Parse frequency (vertex or instance)
+    next_token( parser->lexer, token );
+    if ( expect_keyword( token.text, 6, "vertex" ) ) {
+        attribute.input_rate = hydra::graphics::VertexInputRate::PerVertex;
+    } else if ( expect_keyword( token.text, 8, "instance" ) ) {
+        attribute.input_rate = hydra::graphics::VertexInputRate::PerInstance;
+    }
+}
+
+//
+//
+void vertex_binding_identifier( Parser* parser, Token& token, hydra::graphics::VertexStream& stream ) {
+
+    // Parse binding
+    float value;
+    uint32_t data_index = parser->lexer->data_buffer->current_entries - 1;
+    get_data( *parser->lexer->data_buffer, data_index, value );
+    stream.binding = (uint16_t)value;
+
+    // Parse stride
+    next_token( parser->lexer, token );
+    data_index = parser->lexer->data_buffer->current_entries - 1;
+    get_data( *parser->lexer->data_buffer, data_index, value );
+    stream.stride = (uint16_t)value;
 }
 
 //
@@ -494,6 +677,41 @@ const Property* find_property( const Parser* parser, const StringRef& name ) {
         const Property* list = properties[i];
         if ( equals( name, list->name ) ) {
             return list;
+        }
+    }
+    return nullptr;
+}
+
+//
+//
+const VertexLayout* find_vertex_layout( const Parser* parser, const StringRef& name ) {
+    const std::vector<const VertexLayout*>& layouts = parser->shader.vertex_layouts;
+    for ( size_t i = 0; i < layouts.size(); i++ ) {
+        const VertexLayout* layout = layouts[i];
+        if ( equals( name, layout->name ) ) {
+            return layout;
+        }
+    }
+    return nullptr;
+}
+
+const RenderState* find_render_state( const Parser* parser, const StringRef& name ) {
+    const std::vector<const RenderState*>& render_states = parser->shader.render_states;
+    for ( size_t i = 0; i < render_states.size(); i++ ) {
+        const RenderState* render_state = render_states[i];
+        if ( equals( name, render_state->name ) ) {
+            return render_state;
+        }
+    }
+    return nullptr;
+}
+
+const SamplerState* find_sampler_state( const Parser* parser, const StringRef& name ) {
+    const std::vector<const SamplerState*>& sampler_states = parser->shader.sampler_states;
+    for ( size_t i = 0; i < sampler_states.size(); i++ ) {
+        const SamplerState* state = sampler_states[i];
+        if ( equals( name, state->name ) ) {
+            return state;
         }
     }
     return nullptr;
@@ -803,6 +1021,17 @@ void declaration_layout( Parser* parser ) {
                 // Having at least one list declared, disable automatic list generation.
                 parser->shader.has_local_resource_list = true;
             }
+            else if ( expect_keyword( token.text, 6, "vertex" ) ) {
+
+                next_token( parser->lexer, token );
+
+                VertexLayout* vertex_layout = new VertexLayout();
+                vertex_layout->name = token.text;
+
+                declaration_vertex_layout( parser, *vertex_layout );
+
+                parser->shader.vertex_layouts.emplace_back( vertex_layout );
+            }
         }
     }
 }
@@ -824,6 +1053,249 @@ void declaration_resource_list( Parser* parser, ResourceList& resource_list ) {
             resource_binding_identifier( parser, token, binding, flags );
             resource_list.resources.emplace_back( binding );
             resource_list.flags.emplace_back( flags );
+        }
+    }
+}
+
+//
+//
+void declaration_vertex_layout( Parser* parser, VertexLayout& vertex_layout ) {
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        return;
+    }
+
+    while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
+
+        if ( token.type == Token::Token_Identifier ) {
+
+            if ( expect_keyword( token.text, 9, "attribute" ) ) {
+                hydra::graphics::VertexAttribute vertex_attribute;
+                
+                // Advance to the token after the initial keyword.
+                next_token( parser->lexer, token );
+
+                vertex_attribute_identifier( parser, token, vertex_attribute );
+                vertex_layout.attributes.emplace_back( vertex_attribute );
+            }
+            else if ( expect_keyword( token.text, 7, "binding" ) ) {
+                hydra::graphics::VertexStream vertex_stream_binding;
+
+                // Advance to the token after the initial keyword.
+                next_token( parser->lexer, token );
+
+                vertex_binding_identifier( parser, token, vertex_stream_binding );
+                vertex_layout.streams.emplace_back( vertex_stream_binding );
+            }
+        }
+    }
+}
+
+//
+//
+void declaration_render_states( Parser* parser ) {
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        return;
+    }
+
+    while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
+
+        if ( token.type == Token::Token_Identifier ) {
+
+            if ( expect_keyword( token.text, 5, "state" ) ) {
+                // Advance to next token
+                next_token( parser->lexer, token );
+
+                RenderState* render_state = new RenderState();
+                render_state->name = token.text;
+
+                declaration_render_state( parser, *render_state );
+
+                parser->shader.render_states.emplace_back( render_state );
+            }
+        }
+    }
+}
+
+//
+//
+void declaration_render_state( Parser* parser, RenderState& render_state ) {
+    Token token;
+
+    // Set render state in a default state
+    render_state.blend_state.active_states = 0;
+
+    render_state.depth_stencil.depth_enable = 0;
+    render_state.depth_stencil.depth_write_enable = 0;
+    render_state.depth_stencil.stencil_enable = 0;
+
+    render_state.rasterization.cull_mode = hydra::graphics::CullMode::None;
+    render_state.rasterization.front = hydra::graphics::FrontClockwise::False;
+    render_state.rasterization.fill = hydra::graphics::FillMode::Solid;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        return;
+    }
+
+    while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
+
+        if ( token.type == Token::Token_Identifier ) {
+
+            if ( expect_keyword( token.text, 4, "Cull" ) ) {
+
+                // Advance to the token after the initial keyword.
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 4, "Back" ) ) {
+                    render_state.rasterization.cull_mode = hydra::graphics::CullMode::Back;
+                }
+                else if ( expect_keyword( token.text, 5, "Front" ) ) {
+                    render_state.rasterization.cull_mode = hydra::graphics::CullMode::Front;
+                }
+                else if ( expect_keyword( token.text, 4, "None" ) ) {
+                    render_state.rasterization.cull_mode = hydra::graphics::CullMode::None;
+                }
+            }
+            else if ( expect_keyword( token.text, 5, "ZTest" ) ) {
+
+                // Advance to the token after the initial keyword.
+                next_token( parser->lexer, token );
+
+                // ZTest (Less | Greater | LEqual | GEqual | Equal | NotEqual | Always)
+                if ( expect_keyword( token.text, 4, "Less" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::Less;
+                }
+                else if ( expect_keyword( token.text, 7, "Greater" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::Greater;
+                }
+                else if ( expect_keyword( token.text, 6, "LEqual" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::LessEqual;
+                }
+                else if ( expect_keyword( token.text, 6, "GEqual" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::GreaterEqual;
+                }
+                else if ( expect_keyword( token.text, 5, "Equal" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::Equal;
+                }
+                else if ( expect_keyword( token.text, 8, "NotEqual" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::NotEqual;
+                }
+                else if ( expect_keyword( token.text, 6, "Always" ) ) {
+                    render_state.depth_stencil.depth_comparison = hydra::graphics::ComparisonFunction::Always;
+                }
+
+                render_state.depth_stencil.depth_enable = 1;
+            }
+            else if ( expect_keyword( token.text, 6, "ZWrite" ) ) {
+
+                // Advance to the token after the initial keyword.
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 2, "On" ) ) {
+                    render_state.depth_stencil.depth_write_enable = 1;
+                }
+                else if ( expect_keyword( token.text, 3, "Off" ) ) {
+                    render_state.depth_stencil.depth_write_enable = 0;
+                }
+            }
+            else if ( expect_keyword( token.text, 9, "BlendMode" ) ) {
+
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 5, "Alpha" ) ) {
+                    render_state.blend_state.blend_states[render_state.blend_state.active_states].blend_enabled = 1;
+                    render_state.blend_state.blend_states[render_state.blend_state.active_states].color_operation = hydra::graphics::BlendOperation::Add;
+                    render_state.blend_state.blend_states[render_state.blend_state.active_states].source_color = hydra::graphics::Blend::SrcAlpha;
+                    render_state.blend_state.blend_states[render_state.blend_state.active_states].destination_color = hydra::graphics::Blend::InvSrcAlpha;
+                }
+                else if ( expect_keyword( token.text, 13, "Premultiplied" ) ) {
+                    // TODO
+                }
+                else if ( expect_keyword( token.text, 8, "Additive" ) ) {
+                    // TODO
+                }
+
+                ++render_state.blend_state.active_states;
+            }
+        }
+    }
+}
+
+//
+//
+void declaration_sampler_states( Parser* parser ) {
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        return;
+    }
+
+    while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
+
+        if ( token.type == Token::Token_Identifier ) {
+
+            if ( expect_keyword( token.text, 5, "state" ) ) {
+                // Advance to next token
+                next_token( parser->lexer, token );
+
+                SamplerState* state = new SamplerState();
+                state->name = token.text;
+
+                declaration_sampler_state( parser, *state );
+
+                parser->shader.sampler_states.emplace_back( state );
+            }
+        }
+    }
+}
+
+//
+//
+void declaration_sampler_state( Parser* parser, SamplerState& state ) {
+
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_OpenBrace ) ) {
+        return;
+    }
+
+    while ( !equals_token( parser->lexer, token, Token::Token_CloseBrace ) ) {
+
+        if ( token.type == Token::Token_Identifier ) {
+
+            if ( expect_keyword( token.text, 6, "Filter" ) ) {
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 15, "MinMagMipLinear" ) ) {
+                    state.sampler.min_filter = hydra::graphics::TextureFilter::Linear;
+                    state.sampler.mag_filter = hydra::graphics::TextureFilter::Linear;
+                    state.sampler.mip_filter = hydra::graphics::TextureMipFilter::Linear;
+                }
+            }
+            else if ( expect_keyword( token.text, 8, "AddressU" ) ) {
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 5, "Clamp" ) ) {
+                    state.sampler.address_mode_u = hydra::graphics::TextureAddressMode::Clamp_Border;
+                }
+            }
+            else if ( expect_keyword( token.text, 8, "AddressV" ) ) {
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 5, "Clamp" ) ) {
+                    state.sampler.address_mode_v = hydra::graphics::TextureAddressMode::Clamp_Border;
+                }
+            }
+            else if ( expect_keyword( token.text, 8, "AddressW" ) ) {
+                next_token( parser->lexer, token );
+
+                if ( expect_keyword( token.text, 5, "Clamp" ) ) {
+                    state.sampler.address_mode_w = hydra::graphics::TextureAddressMode::Clamp_Border;
+                }
+            }
         }
     }
 }
@@ -863,6 +1335,38 @@ void declaration_pass_stage( Parser* parser, Pass& pass ) {
     }
 
     pass.stage_name = token.text;
+}
+
+//
+//
+void declaration_pass_vertex_layout( Parser* parser, Pass& pass ) {
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_Equals ) ) {
+        return;
+    }
+
+    next_token( parser->lexer, token );
+    const VertexLayout* vertex_layout = find_vertex_layout( parser, token.text );
+    if ( vertex_layout ) {
+        pass.vertex_layout = vertex_layout;
+    }
+}
+
+//
+//
+void declaration_pass_render_states( Parser* parser, Pass& pass ) {
+    Token token;
+
+    if ( !expect_token( parser->lexer, token, Token::Token_Equals ) ) {
+        return;
+    }
+
+    next_token( parser->lexer, token );
+    const RenderState* render_state = find_render_state( parser, token.text );
+    if ( render_state ) {
+        pass.render_state = render_state;
+    }
 }
 
 //
@@ -947,7 +1451,7 @@ void declaration_includes( Parser* parser ) {
 // CodeGenerator //////////////////////////////////////////////////////////////////////////////
 //
 
-void init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size, uint32_t buffer_count ) {
+void init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size, uint32_t buffer_count, const char* input_filename ) {
     code_generator->parser = parser;
     code_generator->buffer_count = buffer_count;
     code_generator->string_buffers = new StringBuffer[buffer_count];
@@ -955,6 +1459,8 @@ void init_code_generator( CodeGenerator* code_generator, const Parser* parser, u
     for ( uint32_t i = 0; i < buffer_count; i++ ) {
         code_generator->string_buffers[i].init( buffer_size );
     }
+
+    strcpy( code_generator->input_filename, input_filename );
 }
 
 void terminate_code_generator( CodeGenerator* code_generator ) {
@@ -1090,7 +1596,7 @@ static void append_finalized_shader_code( const char* path, const Parser* parser
             continue;
         }
 
-        if ( flag & 0x10 == 0x10 ) {
+        if ( (flag & 0x10) == 0x10 ) {
             const CodeFragment* included_code_fragment = find_code_fragment( parser, code_fragment->includes[i] );
             if ( included_code_fragment ) {
                 code_buffer.append( included_code_fragment->code );
@@ -1102,10 +1608,14 @@ static void append_finalized_shader_code( const char* path, const Parser* parser
             filename_buffer.append( path );
             filename_buffer.append( code_fragment->includes[i] );
             char* include_code = hydra::read_file_into_memory( filename_buffer.data, nullptr );
+            if ( include_code ) {
+                code_buffer.append( include_code );
 
-            code_buffer.append( include_code );
-
-            hydra::hy_free( include_code );
+                hydra::hy_free( include_code );
+            }
+            else {
+                HYDRA_LOG( "Cannot find include file %s\n", filename_buffer.data );
+            }
         }
 
         code_buffer.append( "\n\n" );
@@ -1247,6 +1757,26 @@ static void write_resources_layout( const hfx::Pass& pass, StringBuffer& pass_bu
 
 //
 //
+static void write_vertex_input( const hfx::Pass& pass, StringBuffer& pass_buffer ) {
+    if ( !pass.vertex_layout )
+        return;
+
+    pass_buffer.append( (void*)&pass.vertex_layout->attributes[0], sizeof( hydra::graphics::VertexAttribute ) * pass.vertex_layout->attributes.size() );
+    pass_buffer.append( (void*)&pass.vertex_layout->streams[0], sizeof( hydra::graphics::VertexStream ) * pass.vertex_layout->streams.size() );
+}
+
+//
+//
+static void write_render_states( const hfx::Pass& pass, StringBuffer& pass_buffer ) {
+    if ( !pass.render_state )
+        return;
+
+    using namespace hydra::graphics;
+    pass_buffer.append( (void*)&pass.render_state->rasterization, sizeof( RasterizationCreation ) + sizeof( DepthStencilCreation ) + sizeof( BlendStateCreation ) );
+}
+
+//
+//
 static void write_default_values( StringBuffer& constants_defaults_buffer, StringBuffer& out_buffer, const Shader& shader ) {
 
     // Count number of resources
@@ -1307,13 +1837,13 @@ static void write_properties( StringBuffer& out_buffer, const Shader& shader, co
 
 //
 //
-void compile_shader_effect_file( CodeGenerator* code_generator, const char* path, const char* filename ) {
+void compile_shader_effect_file( CodeGenerator* code_generator, const char* output_path, const char* filename ) {
 
     FILE* output_file;
 
     StringBuffer& filename_buffer = code_generator->string_buffers[0];
     filename_buffer.clear();
-    filename_buffer.append( path );
+    filename_buffer.append( output_path );
     filename_buffer.append( filename );
     fopen_s( &output_file, filename_buffer.data, "wb" );
 
@@ -1322,21 +1852,33 @@ void compile_shader_effect_file( CodeGenerator* code_generator, const char* path
         return;
     }
 
-    // -----------------------------------------------------------------------------------------------------------------------------------
+    // Calculate input path
+    StringBuffer& input_path_buffer = code_generator->string_buffers[7];
+    input_path_buffer.clear();
+    
+    const char* input_path = "";
+    const char* last_directory_separator = strrchr( code_generator->input_filename, '\\' );
+    if ( last_directory_separator ) {
+        const char* folder = input_path_buffer.append_use_substring( code_generator->input_filename, 0, last_directory_separator - &code_generator->input_filename[0] );
+        input_path = input_path_buffer.append_use( "%s\\", folder );
+    }
+    
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // Shader Effect File Format
-    // -----------------------------------------------------------------------------------------------------------------------------------
-    // | Header     | Pass Offset List | Pass Section 0                                                                                    | Pass Section 1
-    // -----------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // | Header     | Pass Offset List | Pass Section 0                                                                                                                   | Pass Section 1
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // |            |                  |                  Pass Header                     |                  Pass Data
-    // -----------------------------------------------------------------------------------------------------------------------------------
-    // |            |                  | Shaders count | Res Count | Res List Offset | name | Shader Chunk List | Shader Code | Res List
-    // -----------------------------------------------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    // |            |                  | Shaders count | Res Count | Res List Offset | name | (Render States | Vertex Input)* | Shader Chunk List | Shader Code | Res List
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     // Pass Section:
     // |                  Pass Header                     |                 Pass Data
-    // -------------------------------------------------------------------------------------------------
-    // Shaders Count | Res Count | Res List Offset | name | Shader Chunk List | Shader Code | Res List
-    // -------------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------------------------------------------
+    // Shaders Count | Res Count | Res List Offset | name | (Render States | Vertex Input)* | Shader Chunk List | Shader Code | Res List
+    // ---------------------------------------------------------------------------------------------------------------------------------
 
     // Alias for string buffers used in the process.
     StringBuffer& shader_code_buffer = code_generator->string_buffers[1];
@@ -1382,21 +1924,22 @@ void compile_shader_effect_file( CodeGenerator* code_generator, const char* path
         // ----------------------------------------------
         // Pass Data
         // ----------------------------------------------
-        // | Shader Chunk List | Shader Code | Res List
+        // (Render States | Vertex Input)* | Shader Chunk List | Shader Code | Res List    (* optionals)
         // ----------------------------------------------
         // ShaderChunk = Shader Offset + Count
 
-
+        const uint32_t vertex_input_size = pass.vertex_layout ? pass.vertex_layout->attributes.size() * sizeof( hydra::graphics::VertexAttribute ) + pass.vertex_layout->streams.size() * sizeof( hydra::graphics::VertexStream ) : 0;
+        const uint32_t shader_list_offset = vertex_input_size + (pass.render_state ? sizeof( hydra::graphics::RasterizationCreation ) + sizeof( hydra::graphics::DepthStencilCreation ) + sizeof( hydra::graphics::BlendStateCreation ) : 0);
         //
         // 2.1 For current pass calculate shader code offsets, relative to the pass section start.
 
-        const uint32_t start_shader_code_offset = pass_shader_stages * sizeof( ShaderEffectFile::ShaderChunk ) + sizeof( ShaderEffectFile::PassHeader );
+        const uint32_t start_shader_code_offset = shader_list_offset + (pass_shader_stages * sizeof( ShaderEffectFile::ShaderChunk )) + sizeof( ShaderEffectFile::PassHeader );
         uint32_t current_shader_code_offset = start_shader_code_offset;
 
         shader_chunk_list_buffer.clear();
         shader_code_buffer.clear();
 
-        const bool automatic_layout = is_resources_layout_automatic( code_generator->parser->shader );
+        const bool automatic_layout = is_resources_layout_automatic( code_generator->parser->shader, pass );
         uint32_t total_resources_layout = 0, local_resources = 0;
 
         //
@@ -1405,7 +1948,7 @@ void compile_shader_effect_file( CodeGenerator* code_generator, const char* path
         for ( size_t s = 0; s < pass_shader_stages; ++s ) {
             const Pass::ShaderStage shader_stage = pass.shader_stages[s];
 
-            append_finalized_shader_code( path, code_generator->parser, shader_stage.stage, shader_stage.code, filename_buffer, shader_code_buffer, true, constants_buffer );
+            append_finalized_shader_code( input_path, code_generator->parser, shader_stage.stage, shader_stage.code, filename_buffer, shader_code_buffer, true, constants_buffer );
 
             update_shader_chunk_list( &current_shader_code_offset, start_shader_code_offset, shader_chunk_list_buffer, shader_code_buffer );
 
@@ -1445,8 +1988,16 @@ void compile_shader_effect_file( CodeGenerator* code_generator, const char* path
         pass_header.num_shader_chunks = pass_shader_stages;
         pass_header.num_resource_layouts = total_resources_layout;
         pass_header.resource_table_offset = shader_code_buffer.current_size + start_shader_code_offset;
+        pass_header.has_resource_state = pass.render_state ? 1 : 0;
+        pass_header.shader_list_offset = shader_list_offset;
+        pass_header.num_vertex_attributes = pass.vertex_layout ? (uint8_t)pass.vertex_layout->attributes.size() : 0;
+        pass_header.num_vertex_streams = pass.vertex_layout ? (uint8_t)pass.vertex_layout->streams.size() : 0;
 
         pass_buffer.append( (void*)&pass_header, sizeof( ShaderEffectFile::PassHeader ) );
+
+        write_render_states( pass, pass_buffer );
+        write_vertex_input( pass, pass_buffer );
+        
         pass_buffer.append( shader_chunk_list_buffer );
         pass_buffer.append( shader_code_buffer );
 
@@ -1660,8 +2211,8 @@ void generate_shader_resource_header( CodeGenerator* code_generator, const char*
 
 //
 //
-bool is_resources_layout_automatic( const Shader& shader ) {
-    return !shader.has_local_resource_list;
+bool is_resources_layout_automatic( const Shader& shader, const Pass& pass ) {
+    return pass.resource_lists.size() == 0;
 }
 
 #endif // HFX_PARSING
@@ -1699,9 +2250,9 @@ void init_shader_effect_file( ShaderEffectFile& file, char* memory ) {
 
 //
 //
-ShaderEffectFile::PassHeader* get_pass( ShaderEffectFile& file, uint32_t index ) {
-    const uint32_t pass_offset = *(uint32_t*)(file.memory + sizeof( ShaderEffectFile::Header ) + (index * sizeof( uint32_t )));
-    return (ShaderEffectFile::PassHeader*)(file.memory + pass_offset);
+ShaderEffectFile::PassHeader* get_pass( char* hfx_memory, uint32_t index ) {
+    const uint32_t pass_offset = *(uint32_t*)(hfx_memory + sizeof( ShaderEffectFile::Header ) + (index * sizeof( uint32_t )));
+    return (ShaderEffectFile::PassHeader*)(hfx_memory + pass_offset);
 }
 
 //
@@ -1716,12 +2267,63 @@ void get_shader_creation( ShaderEffectFile::PassHeader* pass_header, uint32_t in
 
     uint32_t shader_count = pass_header->num_shader_chunks;
     char* pass_memory = (char*)pass_header;
-    char* shader_offset_list_start = pass_memory + sizeof( ShaderEffectFile::PassHeader );
+    char* shader_offset_list_start = pass_memory + sizeof( ShaderEffectFile::PassHeader ) + pass_header->shader_list_offset;
     const uint32_t shader_offset = *(uint32_t*)(shader_offset_list_start + (index * sizeof( ShaderEffectFile::ShaderChunk )));
     char* shader_chunk_start = pass_memory + shader_offset;
 
     shader_creation->type = (hydra::graphics::ShaderStage::Enum)(*shader_chunk_start);
     shader_creation->code = (const char*)(shader_chunk_start + sizeof( hfx::ShaderEffectFile::ChunkHeader ));
+}
+
+//
+// Local method to retrieve vertex input informations.
+//
+static void get_vertex_input( ShaderEffectFile::PassHeader* pass_header, hydra::graphics::VertexInputCreation& vertex_input ) {
+    
+    const uint32_t attribute_count = pass_header->num_vertex_attributes;
+    char* pass_memory = (char*)pass_header;
+    const uint32_t vertex_input_offset = pass_header->has_resource_state ? sizeof( hydra::graphics::RasterizationCreation ) + sizeof( hydra::graphics::DepthStencilCreation ) + sizeof( hydra::graphics::BlendStateCreation ) : 0;
+    char* vertex_input_start = pass_memory + sizeof( ShaderEffectFile::PassHeader ) + vertex_input_offset;
+    
+    vertex_input.num_vertex_attributes = attribute_count;
+    if ( attribute_count ) {
+
+        vertex_input.vertex_attributes = (const hydra::graphics::VertexAttribute*)malloc( sizeof( const hydra::graphics::VertexAttribute ) * attribute_count );
+        memcpy( (void*)vertex_input.vertex_attributes, vertex_input_start, sizeof( const hydra::graphics::VertexAttribute ) * attribute_count );
+
+        vertex_input_start += attribute_count * sizeof( hydra::graphics::VertexAttribute );
+        vertex_input.vertex_streams = (const hydra::graphics::VertexStream*)malloc( sizeof( const hydra::graphics::VertexStream ) * pass_header->num_vertex_streams );
+        memcpy( (void*)vertex_input.vertex_streams, vertex_input_start, sizeof( const hydra::graphics::VertexStream ) * pass_header->num_vertex_streams );
+        vertex_input.num_vertex_streams = pass_header->num_vertex_streams;
+    }
+    else {
+        vertex_input.num_vertex_streams = 0;
+    }
+}
+
+//
+// Fill the pipeline with more informations possible found in the HFX file.
+//
+void get_pipeline( ShaderEffectFile::PassHeader* pass_header, hydra::graphics::PipelineCreation& pipeline ) {
+    // get_shader_creation
+    // get_vertex_input
+    uint32_t shader_count = pass_header->num_shader_chunks;
+    hydra::graphics::ShaderCreation& creation = pipeline.shaders;
+
+    for ( uint16_t i = 0; i < shader_count; i++ ) {
+        hfx::get_shader_creation( pass_header, i, &creation.stages[i] );
+    }
+
+    creation.name = pass_header->name;
+    creation.stages_count = shader_count;
+
+    hfx::get_vertex_input( pass_header, pipeline.vertex_input );
+
+    if ( pass_header->has_resource_state ) {
+        char* pass_memory = (char*)pass_header;
+        char* render_state_memory = pass_memory + sizeof( ShaderEffectFile::PassHeader );
+        memcpy( &pipeline.rasterization, render_state_memory, sizeof( hydra::graphics::RasterizationCreation ) + sizeof( hydra::graphics::DepthStencilCreation ) + sizeof( hydra::graphics::BlendStateCreation ) );
+    }
 }
 
 //
@@ -1751,7 +2353,7 @@ static const size_t                 k_hfx_random_seed       = 0xfeba666ddea21a46
 bool compile_hfx( const char* full_filename, const char* out_folder, const char* out_filename ) {
     char* text = hydra::read_file_into_memory( full_filename, nullptr );
     if ( !text ) {
-        // TODO: message.
+        HYDRA_LOG( "Error compiling file %s: file not found.\n", full_filename );
         return false;
     }
 
@@ -1771,7 +2373,7 @@ bool compile_hfx( const char* full_filename, const char* out_folder, const char*
     hfx::generate_ast( &parser );
 
     hfx::CodeGenerator code_generator;
-    hfx::init_code_generator( &code_generator, &parser, 32 * 1024, 8 );
+    hfx::init_code_generator( &code_generator, &parser, 32 * 1024, 8, full_filename );
 
     // Init header magic
     memcpy( code_generator.binary_header_magic, &file_time, sizeof( hydra::FileTime ) );
@@ -1791,7 +2393,7 @@ bool compile_hfx( const char* full_filename, const char* out_folder, const char*
 void generate_hfx_permutations( const char* file_path, const char* out_folder ) {
     char* text = hydra::read_file_into_memory( file_path, nullptr );
     if ( !text ) {
-        // TODO: message.
+        HYDRA_LOG( "Error compiling file %s: file not found.\n", file_path );
         return;
     }
 
@@ -1811,7 +2413,7 @@ void generate_hfx_permutations( const char* file_path, const char* out_folder ) 
     hfx::generate_ast( &parser );
 
     hfx::CodeGenerator code_generator;
-    hfx::init_code_generator( &code_generator, &parser, 32 * 1024, 8 );
+    hfx::init_code_generator( &code_generator, &parser, 32 * 1024, 8, file_path );
 
     // Init header magic
     memcpy( code_generator.binary_header_magic, &file_time, sizeof( hydra::FileTime ) );

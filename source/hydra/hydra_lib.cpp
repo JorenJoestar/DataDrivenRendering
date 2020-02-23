@@ -1,12 +1,6 @@
 //
-// Hydra Lib - v0.02
-//
-// Simple general functions for log, file, process, time.
-//
-//      Source code     : https://www.github.com/jorenjoestar/
-//
-//      Created         : 2019/06/20, 19.23
-//
+// Hydra Lib - v0.03
+
 
 #include "hydra_lib.h"
 

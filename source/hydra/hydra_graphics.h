@@ -3,16 +3,21 @@
 #include <stdint.h>
 
 //
-//  Hydra Graphics - v0.042
+//  Hydra Graphics - v0.044
 //  3D API wrapper around Vulkan/Direct3D12/OpenGL.
 //  Mostly based on the amazing Sokol library (https://github.com/floooh/sokol), but with a different target (wrapping Vulkan/Direct3D12).
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
-//      Created         : 22/05/2019, 18.50
-//      Last Modified   : 09/10/2019, 18.42
-//      Version         : 0.042
+//      Created         : 2019/05/22, 18.50
+//      Last Modified   : 2019/12/17, 18.42
 //
+//
+// Revision history //////////////////////
+//
+//      0.044 (2020/01/14): + Fixed depth/stencil FBO generation.
+//      0.043 (2019/12/17): + Removed 'compute' creation flag.
+//      0.042 (2019/10/09): + Added initial support for render passes creation. + Added begin/end render pass commands interface.
 //
 // Documentation /////////////////////////
 //
@@ -22,13 +27,13 @@
 //
 //  The API is divided in two sections: resource handling and rendering.
 //
-//  hydra::gfx_device::Device             -- responsible for resource handling and main rendering operations.
-//  hydra::gfx_device::CommandBuffer      -- commands for rendering, compute and copy/transfer
+//  hydra::graphics::Device             -- responsible for resource handling and main rendering operations.
+//  hydra::graphics::CommandBuffer      -- commands for rendering, compute and copy/transfer
 //
 //
 // Usage /////////////////////////////////
 //
-//  1. Define hydra::gfx_device::Device in your code.
+//  1. Define hydra::graphics::Device in your code.
 //  2. call device.init();
 //
 // Defines ///////////////////////////////
@@ -47,13 +52,6 @@
 //  2. init/terminate initialize or terminate a class/struct.
 //  3. Create/Destroy are used for actual creation/destruction of resources.
 //
-//
-// Todo //////////////////////////////////
-//
-//
-// Changelist ////////////////////////////
-//
-//      0.042: + Added initial support for render passes creation. + Added begin/end render pass commands interface.
 
 
 //////////////////////////////////
@@ -473,15 +471,11 @@ namespace TextureAddressMode {
 
 namespace VertexComponentFormat {
     enum Enum {
-        Float, Float2, Float3, Float4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Count
-    };
-
-    enum Mask {
-        Float_mask = 1 << 0, Float2_mask = 1 << 1, Float3_mask = 1 << 2, Float4_mask = 1 << 3, Byte_mask = 1 << 4, Byte4N_mask = 1 << 5, UByte_mask = 1 << 6, UByte4N_mask = 1 << 7, Short2_mask = 1 << 8, Short2N_mask = 1 << 9, Short4_mask = 1 << 10, Short4N_mask = 1 << 11, Count_mask = 1 << 12
+        Float, Float2, Float3, Float4, Mat4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Count
     };
 
     static const char* s_value_names[] = {
-        "Float", "Float2", "Float3", "Float4", "Byte", "Byte4N", "UByte", "UByte4N", "Short2", "Short2N", "Short4", "Short4N", "Count"
+        "Float", "Float2", "Float3", "Float4", "Mat4", "Byte", "Byte4N", "UByte", "UByte4N", "Short2", "Short2N", "Short4", "Short4N", "Count"
     };
 
     static const char* ToString( Enum e ) {
@@ -545,11 +539,11 @@ namespace QueueType {
 
 namespace CommandType {
     enum Enum {
-        BindPipeline, BindResourceTable, BindVertexBuffer, BindIndexBuffer, BindResourceSet, Draw, DrawIndexed, DrawInstanced, DrawIndexedInstanced, Dispatch, CopyResource, SetScissor, SetViewport, Clear, BeginPass, EndPass, Count
+        BindPipeline, BindResourceTable, BindVertexBuffer, BindIndexBuffer, BindResourceSet, Draw, DrawIndexed, DrawInstanced, DrawIndexedInstanced, Dispatch, CopyResource, SetScissor, SetViewport, Clear, ClearDepth, ClearStencil, BeginPass, EndPass, Count
     };
 
     static const char* s_value_names[] = {
-        "BindPipeline", "BindResourceTable", "BindVertexBuffer", "BindIndexBuffer", "BindResourceSet", "Draw", "DrawIndexed", "DrawInstanced", "DrawIndexedInstanced", "Dispatch", "CopyResource", "SetScissor", "SetViewport", "Clear", "BeginPass", "EndPass", "Count"
+        "BindPipeline", "BindResourceTable", "BindVertexBuffer", "BindIndexBuffer", "BindResourceSet", "Draw", "DrawIndexed", "DrawInstanced", "DrawIndexedInstanced", "Dispatch", "CopyResource", "SetScissor", "SetViewport", "Clear", "ClearDepth", "ClearStencil", "BeginPass", "EndPass", "Count"
     };
 
     static const char* ToString( Enum e ) {
@@ -741,6 +735,8 @@ struct SamplerCreation {
     TextureAddressMode::Enum        address_mode_v      = TextureAddressMode::Repeat;
     TextureAddressMode::Enum        address_mode_w      = TextureAddressMode::Repeat;
 
+    const char*                     name                = nullptr;
+
 }; // struct SamplerCreation
 
 //
@@ -809,6 +805,7 @@ struct VertexAttribute {
     uint16_t                        binding             = 0;
     uint32_t                        offset              = 0;
     VertexComponentFormat::Enum     format              = VertexComponentFormat::Count;
+    VertexInputRate::Enum           input_rate          = VertexInputRate::Count;
 
 }; // struct VertexAttribute
 
@@ -818,7 +815,6 @@ struct VertexStream {
 
     uint16_t                        binding             = 0;
     uint16_t                        stride              = 0;
-    VertexInputRate::Enum           input_rate          = VertexInputRate::Count;
 
 }; // struct VertexStream
 
@@ -859,18 +855,16 @@ struct RenderPassCreation {
 //
 struct PipelineCreation {
 
-    ShaderCreation                  shaders;
+    RasterizationCreation           rasterization;
     DepthStencilCreation            depth_stencil;
     BlendStateCreation              blend_state;
     VertexInputCreation             vertex_input;
-    RasterizationCreation           rasterization;
+    ShaderCreation                  shaders;
 
     ResourceListLayoutHandle        resource_list_layout[k_max_resource_layouts];
     const ViewportState*            viewport            = nullptr;
 
     uint32_t                        num_active_layouts  = 0;
-
-    bool                            compute             = false;
 
 }; // struct PipelineCreation
 
@@ -880,10 +874,10 @@ struct PipelineCreation {
 // Helper methods for texture formats
 //
 namespace TextureFormat {
-
+                                                                        // D32_FLOAT_S8X24_UINT, D24_UNORM_S8_UINT, D32_FLOAT, D24_UNORM_X8_UINT, D16_UNORM, S8_UINT
     inline bool                     is_depth_stencil( Enum value )      { return value == D32_FLOAT_S8X24_UINT || value == D24_UNORM_S8_UINT; }
-    inline bool                     is_only_depth( Enum value )         { return value >= D32_FLOAT && value < S8_UINT; }
-    inline bool                     is_onlye_stencil( Enum value )      { return value == S8_UINT; }
+    inline bool                     is_depth_only( Enum value )         { return value >= D32_FLOAT && value < S8_UINT; }
+    inline bool                     is_stencil_only( Enum value )       { return value == S8_UINT; }
 
     inline bool                     has_depth( Enum value )             { return value >= D32_FLOAT && value < S8_UINT; }
     inline bool                     has_stencil( Enum value )           { return value == D32_FLOAT_S8X24_UINT || value == D24_UNORM_S8_UINT || value == S8_UINT; }
@@ -1160,6 +1154,9 @@ struct Device {
     RenderPassGL*                   access_render_pass( RenderPassHandle render_pass );
     const RenderPassGL*             access_render_pass( RenderPassHandle render_pass ) const;
 
+    // Specialized methods
+    void                            link_texture_sampler( TextureHandle texture, SamplerHandle sampler );
+
     DeviceStateGL*                  device_state            = nullptr;
 #elif defined (HYDRA_VULKAN)
     
@@ -1216,7 +1213,10 @@ namespace commands {
     struct BindResourceList : public Command {
 
         ResourceListHandle              handles[k_max_resource_layouts];
+        uint32_t                        offsets[k_max_resource_layouts];
+
         uint32_t                        num_lists;
+        uint32_t                        num_offsets;
 
         static uint16_t                 Type() { return CommandType::BindResourceSet; }
 
@@ -1225,6 +1225,8 @@ namespace commands {
     struct BindVertexBuffer : public Command {
 
         BufferHandle                    buffer;
+        uint32_t                        binding;
+        uint32_t                        byte_offset;
 
         static uint16_t                 Type() { return CommandType::BindVertexBuffer; }
 
@@ -1244,6 +1246,7 @@ namespace commands {
         TopologyType::Enum              topology;
         uint32_t                        first_vertex;
         uint32_t                        vertex_count;
+        uint32_t                        instance_count;
 
         static uint16_t                 Type() { return CommandType::Draw; }
 
@@ -1316,6 +1319,22 @@ namespace commands {
 
     }; // struct Clear
 
+    struct ClearDepth : public Command {
+
+        float                           value;
+
+        static uint16_t                 Type() { return CommandType::ClearDepth; }
+
+    }; // struct Clear
+
+    struct ClearStencil : public Command {
+
+        uint8_t                         value;
+
+        static uint16_t                 Type() { return CommandType::ClearStencil; }
+
+    }; // struct Clear
+
     struct SubmitHeader {
 
         uint32_t                        sentinel;
@@ -1337,6 +1356,12 @@ struct SubmitCommand {
 
 //
 //
+struct CommandKey {
+
+}; // struct CommandKey
+
+//
+//
 struct CommandBuffer {
 
     void                            init( QueueType::Enum type, uint32_t buffer_size, uint32_t submit_size, bool baked );
@@ -1353,15 +1378,18 @@ struct CommandBuffer {
     void                            end_submit();
 
     void                            bind_pipeline( PipelineHandle handle );
-    void                            bind_vertex_buffer( BufferHandle handle );
+    void                            bind_vertex_buffer( BufferHandle handle, uint32_t binding, uint32_t offset );
     void                            bind_index_buffer( BufferHandle handle );
-    void                            bind_resource_list( ResourceListHandle* handles, uint32_t num_lists );
+    void                            bind_resource_list( ResourceListHandle* handles, uint32_t num_lists, uint32_t* offsets, uint32_t num_offsets );
 
     void                            set_viewport( const Viewport& viewport );
     void                            set_scissor( const Rect2D& rect );
-    void                            clear( float red, float green, float blue, float alpha );
 
-    void                            draw( TopologyType::Enum topology, uint32_t start, uint32_t count );
+    void                            clear( float red, float green, float blue, float alpha );
+    void                            clear_depth( float value );
+    void                            clear_stencil( uint8_t value );
+
+    void                            draw( TopologyType::Enum topology, uint32_t start, uint32_t count, uint32_t instance_count = 0 );
     void                            drawIndexed( TopologyType::Enum topology, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t vertex_offset, uint32_t first_instance );
     void                            dispatch( uint32_t group_x, uint32_t group_y, uint32_t group_z );
 
@@ -1402,16 +1430,6 @@ struct CommandBuffer {
 
 }; // struct CommandBuffer
 
-
-// RenderManager ////////////////////////////////////////////////////////////////
-
-struct RenderManager {
-
-    virtual void                    render( CommandBuffer* commands, Device& device ) = 0;
-
-    virtual void                    reload( Device& device ) = 0;
-};
-
 // Inlines //////////////////////////////////////////////////////////////////////
 
 // CommandBuffer ////////////////////////////////////////////////////////////////
@@ -1437,5 +1455,5 @@ const T& CommandBuffer::read_command() {
 
 
 
-} // namespace gfx_device
+} // namespace graphics
 } // namespace hydra

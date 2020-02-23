@@ -1,0 +1,13 @@
+{
+    "name": "Swapchain",
+    "effect_path": "FullscreenTexture.hfx",
+    "properties": [
+
+    ],
+    "bindings": [
+        {
+            "name": "LocalConstants",
+            "resource_name": "LocalConstants"
+        }
+    ]
+}

@@ -1,15 +1,25 @@
 
 //
-// Hydra HFX v0.1
+// Hydra HFX v0.11
 //
-
-// Header-only library, but with definition/implementation separation.
+//      Source code     : https://www.github.com/jorenjoestar/
 //
-// To use the library, write this in only one cpp file:
+//      Created         : 2019/05/22, 18.50
 //
-//      #define HFX_SCG_IMPLEMENTATION
-//      #include "ShaderCodeGenerator.h"
-
+//
+// Revision history //////////////////////
+//
+//      0.11  (2020/02/06): + Added revision history.
+//
+// Defines ///////////////////////////////
+//
+//  Different defines can be used to use custom code:
+//
+//  HYDRA_LOG( message, ... )
+//  HYDRA_MALLOC( size )
+//  HYDRA_FREE( pointer )
+//  HYDRA_ASSERT( condition, message, ... )
+//
 
 #pragma once
 
@@ -93,6 +103,28 @@ namespace hfx {
 
     //
     //
+    struct VertexLayout {
+
+        StringRef                   name;
+        std::vector<hydra::graphics::VertexStream> streams;
+        std::vector<hydra::graphics::VertexAttribute> attributes;
+
+    }; // struct VertexLayout
+
+    //
+    //
+    struct RenderState {
+
+        StringRef                   name;
+
+        hydra::graphics::RasterizationCreation  rasterization;
+        hydra::graphics::DepthStencilCreation   depth_stencil;
+        hydra::graphics::BlendStateCreation     blend_state;
+
+    }; // struct RenderState
+
+    //
+    //
     struct Pass {
 
         struct ShaderStage {
@@ -105,9 +137,21 @@ namespace hfx {
         StringRef                   name;
         StringRef                   stage_name;
         std::vector<ShaderStage>    shader_stages;
+
         std::vector<const ResourceList*> resource_lists;         // List used by the pass
+        const VertexLayout*         vertex_layout;
+        const RenderState*          render_state;
+
     }; // struct Pass
 
+    //
+    //
+    struct SamplerState {
+
+        StringRef                   name;
+        hydra::graphics::SamplerCreation sampler;
+
+    }; // struct SamplerState
 
     //
     //
@@ -119,6 +163,9 @@ namespace hfx {
         std::vector<Pass>               passes;
         std::vector<Property*>          properties;
         std::vector<const ResourceList*> resource_lists;        // All declared lists
+        std::vector<const VertexLayout*> vertex_layouts;        // All declared vertex layouts
+        std::vector<const RenderState*> render_states;          // All declared render states
+        std::vector<const SamplerState*> sampler_states;        // All declared sampler states
         std::vector<StringRef>          hfx_includes;           // HFX files included with this.
         std::vector<CodeFragment>       code_fragments;
 
@@ -148,6 +195,9 @@ namespace hfx {
     const CodeFragment*             find_code_fragment( const Parser* parser, const StringRef& name );
     const ResourceList*             find_resource_list( const Parser* parser, const StringRef& name );
     const Property*                 find_property( const Parser* parser, const StringRef& name );
+    const VertexLayout*             find_vertex_layout( const Parser* parser, const StringRef& name );
+    const RenderState*              find_render_state( const Parser* parser, const StringRef& name );
+    const SamplerState*             find_sampler_state( const Parser* parser, const StringRef& name );
 
     void                            identifier( Parser* parser, const Token& token );
     void                            pass_identifier( Parser* parser, const Token& token, Pass& pass );
@@ -155,6 +205,8 @@ namespace hfx {
     void                            uniform_identifier( Parser* parser, const Token& token, CodeFragment& code_fragment );
     Property::Type                  property_type_identifier( const Token& token );
     void                            resource_binding_identifier( Parser* parser, const Token& token, ResourceBinding& binding, uint32_t flags );
+    void                            vertex_attribute_identifier( Parser* parser, Token& token, hydra::graphics::VertexAttribute& attribute );
+    void                            vertex_binding_identifier( Parser* parser, Token& token, hydra::graphics::VertexStream& stream );
 
     void                            declaration_shader( Parser* parser );
     void                            declaration_glsl( Parser* parser );
@@ -165,9 +217,16 @@ namespace hfx {
     void                            declaration_property( Parser* parser, const StringRef& name );
     void                            declaration_layout( Parser* parser );
     void                            declaration_resource_list( Parser* parser, ResourceList& resource_list );
+    void                            declaration_vertex_layout( Parser* parser, VertexLayout& vertex_layout );
     void                            declaration_pass_resources( Parser* parser, Pass& pass );
     void                            declaration_pass_stage( Parser* parser, Pass& pass );
+    void                            declaration_pass_vertex_layout( Parser* parser, Pass& pass );
+    void                            declaration_pass_render_states( Parser* parser, Pass& pass );
     void                            declaration_includes( Parser* parser );
+    void                            declaration_render_states( Parser* parser );
+    void                            declaration_render_state( Parser* parser, RenderState& render_state );
+    void                            declaration_sampler_states( Parser* parser );
+    void                            declaration_sampler_state( Parser* parser, SamplerState& state );
 
     //
     // CodeGenerator ////////////////////////////////////////////////////
@@ -181,19 +240,21 @@ namespace hfx {
 
         StringBuffer*               string_buffers;
 
+        char                        input_filename[256];            // Full filename of the source HFX file.
+
         char                        binary_header_magic[32];        // Memory used in individual headers when generating binary files.
     }; // struct CodeGenerator
 
-    void                            init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size, uint32_t buffer_count );
+    void                            init_code_generator( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size, uint32_t buffer_count, const char* input_filename );
     void                            terminate_code_generator( CodeGenerator* code_generator );
 
     void                            generate_shader_permutations( CodeGenerator* code_generator, const char* path );
-    void                            compile_shader_effect_file( CodeGenerator* code_generator, const char* path, const char* filename );
+    void                            compile_shader_effect_file( CodeGenerator* code_generator, const char* output_path, const char* filename );
     void                            generate_shader_resource_header( CodeGenerator* code_generator, const char* path );
 
     void                            output_shader_stage( CodeGenerator* code_generator, const char* path, const Pass::ShaderStage& stage );
 
-    bool                            is_resources_layout_automatic( const Shader& shader );
+    bool                            is_resources_layout_automatic( const Shader& shader, const Pass& pass );
 
 #else
     struct Property {
@@ -227,8 +288,12 @@ namespace hfx {
 
 
         struct PassHeader {
-            uint16_t                    num_shader_chunks;
-            uint16_t                    num_resource_layouts;
+            uint8_t                     num_shader_chunks;
+            uint8_t                     num_vertex_streams;
+            uint8_t                     num_vertex_attributes;
+            uint8_t                     num_resource_layouts;
+            uint16_t                    has_resource_state;
+            uint16_t                    shader_list_offset;
             uint32_t                    resource_table_offset;
             char                        name[32];
             char                        stage_name[32];
@@ -247,7 +312,7 @@ namespace hfx {
         }; // struct MaterialProperty
 
 
-        char*                           memory                  = nullptr;  //
+        char*                           memory                  = nullptr;
         Header*                         header                  = nullptr;
 
         uint16_t                        num_resource_defaults   = 0;
@@ -264,8 +329,12 @@ namespace hfx {
     void                                init_shader_effect_file( ShaderEffectFile& file, const char* full_filename );
     void                                init_shader_effect_file( ShaderEffectFile& file, char* memory );
 
-    ShaderEffectFile::PassHeader*       get_pass( ShaderEffectFile& file, uint32_t index );
+    ShaderEffectFile::PassHeader*       get_pass( char* hfx_memory, uint32_t index );
+
     void                                get_shader_creation( ShaderEffectFile::PassHeader* pass_header, uint32_t index, hydra::graphics::ShaderCreation::Stage* shader_creation );
+
+    void                                get_pipeline( ShaderEffectFile::PassHeader* pass_header, hydra::graphics::PipelineCreation& pipeline );
+
     ShaderEffectFile::MaterialProperty* get_property( char* properties_data, uint32_t index );
 
     const hydra::graphics::ResourceListLayoutCreation::Binding* get_pass_layout_bindings( ShaderEffectFile::PassHeader* pass_header, uint32_t layout_index, uint8_t& num_bindings );

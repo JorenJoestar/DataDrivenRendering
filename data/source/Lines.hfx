@@ -1,0 +1,324 @@
+shader Lines {
+
+    layout {
+        vertex main3D {
+            binding 0 16
+            attribute float3 Position 0 0 0 vertex
+            attribute ubyte4n Color 0 1 12 vertex
+        }
+
+        vertex main3DPosition {
+            binding 0 12
+            attribute float3 Position 0 0 0 vertex
+        }
+
+        vertex main3DPositionNormal {
+            binding 0 12
+            binding 1 12
+            binding 3 64
+            attribute float3 Position 0 0 0 vertex
+            attribute float3 Normal 1 1 0 vertex
+            attribute float4 InstanceTransform 3 3 0 instance
+            attribute float4 InstanceTransform 3 4 16 instance
+            attribute float4 InstanceTransform 3 5 32 instance
+            attribute float4 InstanceTransform 3 6 48 instance
+        }
+
+        vertex instancedLines {
+            binding 0 32
+            attribute float3 point_a 0 0 0 instance
+            attribute ubyte4n color_a 0 1 12 instance
+            attribute float3 point_b 0 2 16 instance
+            attribute ubyte4n color_b 0 3 28 instance
+        }
+
+        vertex instancedLines2D {
+            binding 0 24
+            attribute float2 point_a 0 0 0 instance
+            attribute ubyte4n color_a 0 1 8 instance
+            attribute float2 point_b 0 2 12 instance
+            attribute ubyte4n color_b 0 3 20 instance
+        }
+    }
+
+    render_states {
+        state main {
+            Cull Back
+            ZTest LEqual
+            ZWrite On
+        }
+
+        state linesZTest {
+            Cull None
+            ZTest LEqual
+            ZWrite Off
+            BlendMode Alpha
+        }
+    }
+
+    glsl RoundCapJoin3D {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 Position;
+        layout (location = 1) in vec4 Color;
+
+        uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        out vec4 Frag_Color;
+
+        void main()
+        {
+            Frag_Color = Color;
+            gl_Position = view_projection_matrix * vec4(Position.xyz, 1.0f);
+        }
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        in vec4 Frag_Color;
+        
+        layout (location = 0) out vec4 Out_Color;
+        
+        void main()
+        {
+            Out_Color = Frag_Color;
+        }
+        #endif // FRAGMENT
+    }
+    
+    glsl PositionOnly {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 Position;
+
+        uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        void main()
+        {
+            gl_Position = view_projection_matrix * vec4(Position.xyz, 1.0f);
+        }
+        out vec4 vTexCoord;
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) out vec4 Out_Color;
+        
+        void main()
+        {
+            Out_Color = vec4(1,1,1,1);
+        }
+        #endif // FRAGMENT
+    }
+
+    glsl PositionNormals {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 Position;
+        layout (location = 1) in vec3 Normal;
+        layout (location = 3) in mat4 instanceTransform;
+
+        layout (std140, binding=0) uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+
+        out vec3 vertexNormal;
+
+        void main()
+        {
+            vertexNormal = Normal;
+            gl_Position = view_projection_matrix * instanceTransform * vec4(Position.xyz, 1.0f);
+        }
+        
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) out vec4 Out_Color;
+        layout (location = 1) out vec4 Out_Normals;
+        in vec3 vertexNormal;
+        
+        void main()
+        {
+            Out_Normals = vec4(vertexNormal * 0.5 + 0.5, 1);
+
+            vec3 L = vec3(-0.7, 0.7, 0 );
+            float lambert_diffuse = max(0, dot(vertexNormal, L));
+            Out_Color = vec4(lambert_diffuse.xxx, 1);
+        }
+        #endif // FRAGMENT
+    }
+
+    glsl InstancedLines3D {
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 point_a;
+        layout (location = 1) in vec4 color_a;
+        layout (location = 2) in vec3 point_b;
+        layout (location = 3) in vec4 color_b;
+
+        uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+        
+        out vec4 Frag_Color;
+
+        vec2 segmentInstanceGeometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
+        vec2 uv[6] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 0), vec2(1, 1), vec2(0, 1)};
+
+        float expansion_direction[6] = { 1, -1, -1, 1, -1, 1 };
+
+        void main()
+        {
+            vec2 position = segmentInstanceGeometry[gl_VertexID % 6];
+            const float width = 1;
+
+            vec4 clip0 = view_projection_matrix * vec4(point_a, 1.0);
+            vec4 clip1 = view_projection_matrix * vec4(point_b, 1.0);
+
+            vec2 screen0 = resolution.xy * ((0.5 * clip0.xy/clip0.w) + 0.5);
+            vec2 screen1 = resolution.xy * ((0.5 * clip1.xy/clip1.w) + 0.5);
+
+            vec2 xBasis = normalize(screen1 - screen0);
+            vec2 yBasis = vec2(-xBasis.y, xBasis.x);
+            vec2 pt0 = screen0 + width * (0 * position.x * xBasis + position.y * yBasis);
+            vec2 pt1 = screen1 + width * (0 * position.x * xBasis + position.y * yBasis);
+            vec2 pt = mix(pt0, pt1, position.x);
+
+            vec4 clip = mix(clip0, clip1, position.x);
+
+            gl_Position = vec4(clip.w * ((2.0 * pt) * resolution.zw - 1.0), clip.z, clip.w);
+
+            Frag_Color = mix(color_a, color_b, position.x);
+            
+        }
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        in vec4 Frag_Color;
+        
+        layout (location = 0) out vec4 Out_Color;
+        
+        void main()
+        {
+            vec4 col = Frag_Color;
+            
+            Out_Color = col;
+        }
+        #endif // FRAGMENT
+    }
+
+    glsl InstancedLines2D {
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec2 point_a;
+        layout (location = 1) in vec4 color_a;
+        layout (location = 2) in vec2 point_b;
+        layout (location = 3) in vec4 color_b;
+
+        uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+        };
+        
+        out vec4 Frag_Color;
+
+        vec2 segmentInstanceGeometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
+
+        void main()
+        {
+            // 2D Line working
+            vec2 position = segmentInstanceGeometry[gl_VertexID % 6];
+            vec2 x_basis = point_b.xy - point_a.xy;
+            vec2 y_basis = normalize( vec2(-x_basis.y, x_basis.x) );
+
+            const float width = 1;
+            vec3 point = vec3(point_a.xy + x_basis * position.x + y_basis * width * position.y, 0);
+            gl_Position = projection_matrix * vec4(point.xyz, 1.0f);
+
+            Frag_Color = mix(color_a, color_b, position.x);
+        }
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        in vec4 Frag_Color;
+        
+        layout (location = 0) out vec4 Out_Color;
+        
+        void main()
+        {
+            vec4 col = Frag_Color;
+            
+            Out_Color = col;
+        }
+        #endif // FRAGMENT
+    }
+
+    pass RoundCapJoin3D {
+        render_states = linesZTest
+        vertex_layout = main3D
+        vertex = RoundCapJoin3D
+        fragment = RoundCapJoin3D
+    }
+
+    pass PositionN {
+        render_states = main
+        vertex_layout = main3DPositionNormal
+        vertex = PositionNormals
+        fragment = PositionNormals
+    }
+
+    pass PositionOnly {
+        render_states = main
+        vertex_layout = main3DPosition
+        vertex = PositionOnly
+        fragment = PositionOnly
+    }
+
+    pass InstancedLines3D {
+        render_states = linesZTest
+        vertex_layout = instancedLines
+        vertex = InstancedLines3D
+        fragment = InstancedLines3D
+    }
+
+    pass InstancedLines2D {
+        render_states = linesZTest
+        vertex_layout = instancedLines2D
+        vertex = InstancedLines2D
+        fragment = InstancedLines2D
+    }
+}

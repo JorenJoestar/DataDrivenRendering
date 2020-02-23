@@ -1,0 +1,33 @@
+{
+    "name": "SimpleFullscreen",
+    "effect_path": "SimpleFullscreen.hfx",
+    "properties": [
+        {
+            "scale": 16.0,
+            "albedo": "AngeloCensorship.png",
+            "modulo": 2.0
+        }
+    ],
+    "bindings": [
+        {
+            "name": "LocalConstants",
+            "resource_name": "LocalConstants"
+        },
+        {
+            "name": "destination_texture",
+            "resource_name": "compute_output_texture"
+        },
+        {
+            "name": "input_texture",
+            "resource_name": "compute_output_texture"
+        },
+        {
+            "name": "albedo_texture",
+            "resource_name": "albedo"
+        },
+        {
+            "name": "LightingConstants",
+            "resource_name": "lighting_constants"
+        }
+    ]
+}

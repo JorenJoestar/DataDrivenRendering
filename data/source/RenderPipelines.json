@@ -1,0 +1,208 @@
+{
+    "RenderPipelines": [
+        {
+            "name": "PBR_Deferred",
+            "RenderTargets": [
+                {
+                    "name": "GBufferAlbedo",
+                    "format": "R8G8B8A8_UNORM"
+                },
+                {
+                    "name": "GBufferNormals",
+                    "format": "R16G16B16A16_SNORM"
+                },
+                {
+                    "name": "GBufferProperties0",
+                    "format": "R8G8B8A8_UNORM"
+                },
+                {
+                    "name": "MainDepth",
+                    "format": "D24_UNORM_S8_UINT"
+                },
+                {
+                    "name": "BackBufferColor",
+                    "format": "R16G16B16A16_FLOAT"
+                }
+            ],
+            "RenderStages": [
+                {
+                    "name": "GBufferOpaque",
+                    "type": "Geometry",
+                    "mask": "...",
+                    "render_view": "main",
+                    "depth_stencil": "Post",
+                    "inputs": [
+
+                    ],
+                    "outputs": {
+                        "rts": [ "GBufferAlbedo", "GBufferNormals", "GBufferProperties0" ],
+                        "depth": "MainDepth",
+                        "flags": "Common",
+                        "clear_color": "000000ff",
+                        "clear_depth": 1.0,
+                        "clear_stencil": 0
+                    }
+                },
+                {
+                    "name": "DeferredLights",
+                    "type": "PostCompute",
+                    "mask": "...",
+                    "render_view": "main",
+                    "material_name": "SimpleFullscreen",
+                    "material_pass_index": 2,
+                    "inputs": [
+                        {
+                            "name": "GBufferAlbedo",
+                            "sampler": "Point",
+                            "binding": "gbuffer_albedo"
+                        },
+                        {
+                            "name": "GBufferNormals",
+                            "sampler": "Point",
+                            "binding": "gbuffer_normals"
+                        },
+                        {
+                            "name": "GBufferProperties0",
+                            "sampler": "Point",
+                            "binding": "gbuffer_properties0"
+                        },
+                        {
+                            "name": "MainDepth",
+                            "sampler": "Point",
+                            "binding": "depth_texture"
+                        }
+                    ],
+                    "outputs": {
+                        "images": [
+                            {
+                                "name": "BackBufferColor",
+                                "binding": "destination_texture"
+                            }
+                        ],
+                        "flags": "Common"
+                    }
+                },
+                {
+                    "name": "DebugRendering",
+                    "type": "Geometry",
+                    "mask": "...",
+                    "render_view": "main",
+                    "inputs": [
+
+                    ],
+                    "outputs": {
+                        "rts": [ "BackBufferColor" ],
+                        "depth": "MainDepth",
+                        "flags": "Common"
+                    }
+                },
+                {
+                    "name": "Swapchain",
+                    "type": "Swapchain",
+                    "mask": "FRAMEBUFFER",
+                    "material_name": "Swapchain",
+                    "render_view": "",
+                    "depth_stencil": "Post",
+                    "inputs": [
+                        {
+                            "name": "BackBufferColor",
+                            "sampler": "Point",
+                            "binding": "input_texture"
+                        }
+                    ],
+                    "outputs": {
+                        "rts": [
+                        ],
+                        "depth": "",
+                        "flags": "Common",
+                        "clear_color": "000000ff"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Default",
+            "Textures": [
+                {
+                    "name": "first_texture",
+                    "path": "..\\data\\AngeloCensorship.png"
+                }
+            ],
+            "RenderStages": [
+                {
+                    "name": "Swapchain",
+                    "type": "Swapchain",
+                    "mask": "FRAMEBUFFER",
+                    "material_name": "Swapchain",
+                    "render_view": "",
+                    "depth_stencil": "Post",
+                    "inputs": [
+                        {
+                            "name": "first_texture",
+                            "sampler": "Point",
+                            "binding": "input_texture"
+                        }
+                    ],
+                    "outputs": {
+                        "rts": [
+                        ],
+                        "depth": "",
+                        "flags": "Common",
+                        "clear_color": "000000ff"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "ShaderToy",
+            "RenderTargets": [
+                {
+                    "name": "StarOutput",
+                    "format": "R8G8B8A8_UNORM"
+                }
+            ],
+            "RenderStages": [
+                {
+                    "name": "StarNest",
+                    "type": "Post",
+                    "mask": "...",
+                    "material_name": "StarNest",
+                    "material_pass_index": 0,
+                    "render_view": "",
+                    "depth_stencil": "Post",
+                    "inputs": [
+
+                    ],
+                    "outputs": {
+                        "rts": [ "StarOutput" ],
+                        "depth": "",
+                        "flags": "Common",
+                        "clear_color": "000000ff"
+                    }
+                },
+                {
+                    "name": "Swapchain",
+                    "type": "Swapchain",
+                    "mask": "FRAMEBUFFER",
+                    "material_name": "Swapchain",
+                    "render_view": "",
+                    "depth_stencil": "Post",
+                    "inputs": [
+                        {
+                            "name": "StarOutput",
+                            "sampler": "Point",
+                            "binding": "input_texture"
+                        }
+                    ],
+                    "outputs": {
+                        "rts": [
+                        ],
+                        "depth": "",
+                        "flags": "Common",
+                        "clear_color": "000000ff"
+                    }
+                }
+            ]
+        }
+    ]
+}

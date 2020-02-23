@@ -96,7 +96,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\source;..\source\imgui;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\source;..\source\imgui;..\source\rapidjson;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;..\source\NodeEditor\Include;..\source\BlueprintUtilities\Include;..\source\BlueprintUtilities\Source;..\source\cglm</AdditionalIncludeDirectories>
       <ExceptionHandling>false</ExceptionHandling>
       <PreprocessorDefinitions>HYDRA_OPENGL;_CRT_SECURE_NO_WARNINGS;IMGUI_IMPL_OPENGL_LOADER_GLEW;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -130,7 +130,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\source;..\source\imgui;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\source;..\source\imgui;..\source\rapidjson;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;..\source\NodeEditor\Include;..\source\BlueprintUtilities\Include;..\source\BlueprintUtilities\Source</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HYDRA_OPENGL;_CRT_SECURE_NO_WARNINGS;IMGUI_IMPL_OPENGL_LOADER_GLEW;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -163,8 +163,10 @@
   <ItemGroup>
     <ClCompile Include="..\source\hydra\hydra_application.cpp" />
     <ClCompile Include="..\source\hydra\hydra_graphics.cpp" />
+    <ClCompile Include="..\source\hydra\hydra_rendering.cpp" />
     <ClCompile Include="..\source\hydra\hydra_imgui.cpp" />
     <ClCompile Include="..\source\hydra\hydra_lib.cpp" />
+    <ClCompile Include="..\source\hydra\hydra_resources.cpp" />
     <ClCompile Include="..\source\imgui\imgui.cpp" />
     <ClCompile Include="..\source\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\source\imgui\imgui_draw.cpp" />
@@ -174,6 +176,11 @@
     <ClCompile Include="..\source\main.cpp" />
     <ClCompile Include="..\source\Lexer.cpp" />
     <ClCompile Include="..\source\MaterialSystem.cpp" />
+    <ClCompile Include="..\source\NodeEditor\Source\crude_json.cpp" />
+    <ClCompile Include="..\source\NodeEditor\Source\imgui_canvas.cpp" />
+    <ClCompile Include="..\source\NodeEditor\Source\imgui_node_editor.cpp" />
+    <ClCompile Include="..\source\NodeEditor\Source\imgui_node_editor_api.cpp" />
+    <ClCompile Include="..\source\RenderPipelineApplication.cpp" />
     <ClCompile Include="..\source\ShaderCodeGenerator.cpp" />
     <ClCompile Include="..\source\CustomShaderLanguage.cpp" />
   </ItemGroup>
@@ -182,10 +189,13 @@
     <ClInclude Include="..\source\Deprecated.h" />
     <ClInclude Include="..\source\hydra\hydra_application.h" />
     <ClInclude Include="..\source\hydra\hydra_graphics.h" />
+    <ClInclude Include="..\source\hydra\hydra_rendering.h" />
     <ClInclude Include="..\source\hydra\hydra_imgui.h" />
     <ClInclude Include="..\source\hydra\hydra_lib.h" />
+    <ClInclude Include="..\source\hydra\hydra_resources.h" />
     <ClInclude Include="..\source\Lexer.h" />
     <ClInclude Include="..\source\MaterialSystem.h" />
+    <ClInclude Include="..\source\RenderPipelineApplication.h" />
     <ClInclude Include="..\source\ShaderCodeGenerator.h" />
     <ClInclude Include="..\source\stb_ds.h" />
     <ClInclude Include="..\source\CustomShaderLanguage.h" />
