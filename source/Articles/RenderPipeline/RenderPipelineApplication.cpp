@@ -7,7 +7,7 @@
 
 #include "RenderPipelineApplication.h"
 #include "ShaderCodeGenerator.h"
-#include "MaterialSystem.h"
+//#include "MaterialSystem.h"
 
 #include "hydra/hydra_resources.h"
 
@@ -16,6 +16,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include "SDL_scancode.h"
@@ -332,6 +333,8 @@ static bool load_model( hydra::graphics::Device& device, tinygltf::Model& model,
             const tinygltf::BufferView& buffer_view = model.bufferViews[i];
             const tinygltf::Buffer& buffer = model.buffers[buffer_view.buffer];
 
+            // TODO Opengl:
+#if defined (HYDRA_OPENGL)
             switch ( buffer_view.target ) {
                 case GL_ARRAY_BUFFER:
                 {
@@ -351,6 +354,7 @@ static bool load_model( hydra::graphics::Device& device, tinygltf::Model& model,
                     break;
                 }
             }
+#endif // HYDRA_OPENGL
 
             buffer_creation.initial_data = (void*)(&buffer.data.at( 0 ) + buffer_view.byteOffset);
             buffer_creation.size = buffer_view.byteLength;
@@ -421,7 +425,11 @@ void RenderPipelineApplication::app_init() {
 
 
     // Choose pipeline
+#if defined (HYDRA_OPENGL)
     render_pipeline_manager.set_pipeline( gfx_device, "PBR_Deferred", temporary_string_buffer, initial_db );
+#else
+    render_pipeline_manager.set_pipeline( gfx_device, "Default", temporary_string_buffer, initial_db );
+#endif // HYDRA_OPENGL
 
     // Initialize graph
     if ( render_pipeline_manager.current_render_pipeline ) {
@@ -503,6 +511,7 @@ void RenderPipelineApplication::app_init() {
     // Load scene
     tinygltf::Model loaded_model;
 
+#if defined (HYDRA_OPENGL)
     hydra::graphics::RenderScene render_scene;
     //load_model( gfx_device, loaded_model, "../data/GLTF/Lantern/Lantern.gltf", render_scene, g_resource_manager, temporary_string_buffer, render_pipeline_manager.current_render_pipeline );
     //load_model( gfx_device, loaded_model, "../data/GLTF/Box/Box.gltf", render_scene, g_resource_manager, temporary_string_buffer, render_pipeline_manager.current_render_pipeline );
@@ -520,8 +529,13 @@ void RenderPipelineApplication::app_init() {
     scene_renderer.material = line_renderer.line_material;
 
     array_push( main_render_view.visible_render_scenes, render_scene );
+#else
 
-    reload_shaders = -1;
+    line_renderer.line_material->load_resources( render_pipeline_manager.current_render_pipeline->resource_database, gfx_device );
+
+#endif
+
+    reload_shaders = false;
 }
 
 void RenderPipelineApplication::app_terminate() {
@@ -530,15 +544,10 @@ void RenderPipelineApplication::app_terminate() {
 
 void RenderPipelineApplication::app_render( hydra::graphics::CommandBuffer* commands ) {
 
-    if ( reload_shaders > 0 ) {
-        --reload_shaders;
-
-        return;
-    }
-
-    if ( reload_shaders == 0 ) {
+    if ( reload_shaders ) {
         g_resource_manager.reload_resources( hydra::ResourceType::Material, gfx_device, render_pipeline_manager.current_render_pipeline );
-        reload_shaders = -1;
+
+        reload_shaders = false;
     }
 
     auto& io = ImGui::GetIO();
@@ -770,7 +779,7 @@ void RenderPipelineApplication::app_render( hydra::graphics::CommandBuffer* comm
         ImGui::Checkbox( "Show Grid", &show_grid );
 
         if ( ImGui::Button( "Reload Shaders" ) ) {
-            reload_shaders = 3;
+            reload_shaders = true;
         }
     }
 
@@ -1197,12 +1206,17 @@ hydra::graphics::RenderPipeline* RenderPipelineManager::create_pipeline( hydra::
             int image_width, image_height, channels_in_file;
             unsigned char* my_image_data = stbi_load( texture_creation.path, &image_width, &image_height, &channels_in_file, 4 );
 
-            hydra::graphics::TextureCreation graphics_texture_creation = { my_image_data, image_width, image_height, 1, 1, 0, hydra::graphics::TextureFormat::R8G8B8A8_UNORM, hydra::graphics::TextureType::Texture2D };
-            graphics_texture_creation.name = texture_creation.name;
-            graphics::TextureHandle handle = device.create_texture( graphics_texture_creation );
-            
-            string_hash_put( render_pipeline->name_to_texture, texture_creation.name, handle );
-            render_pipeline->resource_database.register_texture( (char*)texture_creation.name, handle );
+            if ( my_image_data ) {
+                hydra::graphics::TextureCreation graphics_texture_creation = { my_image_data, image_width, image_height, 1, 1, 0, hydra::graphics::TextureFormat::R8G8B8A8_UNORM, hydra::graphics::TextureType::Texture2D };
+                graphics_texture_creation.name = texture_creation.name;
+                graphics::TextureHandle handle = device.create_texture( graphics_texture_creation );
+
+                string_hash_put( render_pipeline->name_to_texture, texture_creation.name, handle );
+                render_pipeline->resource_database.register_texture( (char*)texture_creation.name, handle );
+            }
+            else {
+                hydra::print_format( "Cannot load image %s\n", texture_creation.path );
+            }
         }        
     }
 
@@ -1358,4 +1372,12 @@ hydra::graphics::RenderPipeline* RenderPipelineManager::create_pipeline( hydra::
     render_pipeline->resource_database.register_buffer( (char*)checker_constants_creation.name, shadertoy_buffer );
 
     return render_pipeline;
+}
+
+int main(int argc, char** argv) {
+
+    RenderPipelineApplication render_pipeline_application;
+    render_pipeline_application.main_loop();
+
+    return 0;
 }

@@ -125,7 +125,7 @@
             "Textures": [
                 {
                     "name": "first_texture",
-                    "path": "..\\data\\AngeloCensorship.png"
+                    "path": "..\\data\\source\\AngeloCensorship.png"
                 }
             ],
             "RenderStages": [

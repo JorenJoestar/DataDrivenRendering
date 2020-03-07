@@ -138,6 +138,6 @@ struct RenderPipelineApplication : public hydra::Application {
     CameraMovementUpdate            camera_movement_update;
 
     bool                            show_grid;
-    int8_t                          reload_shaders;
+    bool                            reload_shaders;
 
 }; // struct RenderPipelineApplication

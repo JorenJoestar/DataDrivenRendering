@@ -361,7 +361,12 @@ void ShaderFactory::compile_resource( CompileContext& context ) {
     // Compile to bhfx
     const char* bhfx_filename = context.temp_string_buffer.append_use( "%s.bhfx", output_filename );
     const char* hfx_full_filename = context.temp_string_buffer.append_use( "%s%s", context.resource_manager->get_resource_source_folder(), context.out_header->id.path );
+
+#if defined(HYDRA_OPENGL)
+    
     hfx::compile_hfx( hfx_full_filename, context.resource_manager->get_resource_binary_folder(), bhfx_filename );
+
+#endif // HYDRA_VULKAN
 
     // Read the newly generated bhfx file
     char* bhfx_memory = hydra::read_file_into_memory( context.compiled_filename, &context.out_header->data_size );
@@ -414,8 +419,6 @@ void* ShaderFactory::load( LoadContext& context ) {
 
             pipeline_creation.resource_list_layout[l] = context.device.create_resource_list_layout( resource_layout_creation );
         }
-
-        pipeline_creation.num_active_layouts = pass_header->num_resource_layouts;
 
         // Create pipeline
         shader_pass.pipeline_handle = context.device.create_pipeline( pipeline_creation );
@@ -501,8 +504,6 @@ void ShaderFactory::reload( Resource* old_resource, Resource* new_resource, Stri
 
             pipeline_creation.resource_list_layout[l] = gfx_device.create_resource_list_layout( resource_layout_creation );
         }
-
-        pipeline_creation.num_active_layouts = pass_header->num_resource_layouts;
 
         // Create pipeline
         shader_pass.pipeline_handle = gfx_device.create_pipeline( pipeline_creation );
@@ -785,15 +786,15 @@ void* MaterialFactory::load( LoadContext& context ) {
     }
 
     // 5. Bind material to pipeline
-    //for ( uint8_t p = 0; p < shader_effect->num_passes; ++p ) {
-    //    char* stage_name = shader_effect->passes[p].name;
-    //    hydra::graphics::RenderStage* stage = string_hash_get( context.render_pipeline->name_to_stage, stage_name );
+    for ( uint8_t p = 0; p < shader_effect->num_passes; ++p ) {
+        char* stage_name = shader_effect->passes[p].name;
+        hydra::graphics::RenderStage* stage = string_hash_get( context.render_pipeline->name_to_stage, stage_name );
 
-    //    if ( stage ) {
-    //        stage->material = material;
-    //        stage->pass_index = (uint8_t)p;
-    //    }
-    //}
+        if ( stage ) {
+            stage->material = material;
+            stage->pass_index = (uint8_t)p;
+        }
+    }
 
     return material;
 }

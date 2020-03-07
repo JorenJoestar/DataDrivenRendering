@@ -38,8 +38,11 @@ shader StarNest {
         #define volsteps 20
         #define stepsize 0.1
 
-        #define zoom   local_constants.zoom
-        #define tile   local_constants.tile
+        #define zoom   0.8 
+        //local_constants.zoom
+
+        #define tile   0.850
+        // local_constants.tile
         #define speed  0.010 
 
         #define brightness 0.0015

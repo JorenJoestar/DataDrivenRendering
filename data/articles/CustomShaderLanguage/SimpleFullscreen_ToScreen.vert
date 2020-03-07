@@ -1,18 +1,22 @@
-shader FullscreenTexture {
+#version 450
 
-    // For the developer
-    layout {
-        list Local {
-            texture2D input_texture;
-        }
-    }
-    
-    glsl ToScreen {
 
-        #pragma include "Platform.h"
+
+		#define VERTEX
+
+		layout (std140, binding=7) uniform LocalConstants {
+
+			float					scale;
+			float					modulo;
+			float					pad_tail[2];
+
+		} local_constants;
+
+
+		#pragma include "Platform.h"
 
         #if defined VERTEX
-        layout (location = 0) out vec4 vTexCoord;
+        out vec4 vTexCoord;
 
         void main() {
 
@@ -25,43 +29,16 @@ shader FullscreenTexture {
 
         #if defined FRAGMENT
 
-        layout (location = 0) in vec4 vTexCoord;
+        in vec4 vTexCoord;
 
-        layout (location = 0) out vec4 outColor;
+        out vec4 outColor;
 
         layout(binding=0) uniform sampler2D input_texture;
 
         void main() {
             vec3 color = texture2D(input_texture, vTexCoord.xy).xyz;
+            outColor = vec4(1, 1, 0, 1);
             outColor = vec4(color, 1);
         }
         #endif // FRAGMENT
-    }
-
-    pipeline = Default
-
-    pass ToScreen {
-        stage = final
-        resources = Local
-        vertex = ToScreen
-        fragment = ToScreen
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    

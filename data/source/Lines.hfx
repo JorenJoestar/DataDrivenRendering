@@ -65,13 +65,13 @@ shader Lines {
         layout (location = 0) in vec3 Position;
         layout (location = 1) in vec4 Color;
 
-        uniform LocalConstants { 
+        UniformBuffer(0) LocalConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;
         };
 
-        out vec4 Frag_Color;
+        layout (location = 0) out vec4 Frag_Color;
 
         void main()
         {
@@ -83,7 +83,7 @@ shader Lines {
 
         #if defined FRAGMENT
 
-        in vec4 Frag_Color;
+        layout (location = 0) in vec4 Frag_Color;
         
         layout (location = 0) out vec4 Out_Color;
         
@@ -102,7 +102,7 @@ shader Lines {
 
         layout (location = 0) in vec3 Position;
 
-        uniform LocalConstants { 
+        UniformBuffer(0) LocalConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;
@@ -112,7 +112,8 @@ shader Lines {
         {
             gl_Position = view_projection_matrix * vec4(Position.xyz, 1.0f);
         }
-        out vec4 vTexCoord;
+
+        layout (location = 0) out vec4 vTexCoord;
 
         #endif // VERTEX
 
@@ -137,13 +138,13 @@ shader Lines {
         layout (location = 1) in vec3 Normal;
         layout (location = 3) in mat4 instanceTransform;
 
-        layout (std140, binding=0) uniform LocalConstants { 
+        UniformBuffer(0) LocalConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;
         };
 
-        out vec3 vertexNormal;
+        layout (location = 0) out vec3 vertexNormal;
 
         void main()
         {
@@ -158,7 +159,7 @@ shader Lines {
 
         layout (location = 0) out vec4 Out_Color;
         layout (location = 1) out vec4 Out_Normals;
-        in vec3 vertexNormal;
+        layout (location = 0) in vec3 vertexNormal;
         
         void main()
         {
@@ -181,13 +182,13 @@ shader Lines {
         layout (location = 2) in vec3 point_b;
         layout (location = 3) in vec4 color_b;
 
-        uniform LocalConstants { 
+        UniformBuffer(0) LocalConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;
         };
         
-        out vec4 Frag_Color;
+        layout (location = 0) out vec4 Frag_Color;
 
         vec2 segmentInstanceGeometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
         vec2 uv[6] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 0), vec2(1, 1), vec2(0, 1)};
@@ -223,7 +224,7 @@ shader Lines {
 
         #if defined FRAGMENT
 
-        in vec4 Frag_Color;
+        layout (location = 0) in vec4 Frag_Color;
         
         layout (location = 0) out vec4 Out_Color;
         
@@ -246,13 +247,13 @@ shader Lines {
         layout (location = 2) in vec2 point_b;
         layout (location = 3) in vec4 color_b;
 
-        uniform LocalConstants { 
+        UniformBuffer(0) LocalConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;
         };
         
-        out vec4 Frag_Color;
+        layout (location = 0) out vec4 Frag_Color;
 
         vec2 segmentInstanceGeometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
 
@@ -274,7 +275,7 @@ shader Lines {
 
         #if defined FRAGMENT
 
-        in vec4 Frag_Color;
+        layout (location = 0) in vec4 Frag_Color;
         
         layout (location = 0) out vec4 Out_Color;
         

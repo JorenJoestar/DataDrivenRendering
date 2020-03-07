@@ -1,0 +1,34 @@
+#version 450
+
+
+
+		#define COMPUTE
+
+		layout (std140, binding=7) uniform LocalConstants {
+
+			float					scale;
+			float					modulo;
+			float					pad_tail[2];
+
+		} local_constants;
+
+
+		#pragma include "Platform.h"
+
+        layout(binding=1) uniform sampler2D albedo_texture;
+
+        layout(rgba8, binding=0) writeonly uniform image2D destination_texture;
+
+        layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+        void main() {
+
+            ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+
+            // Returns a checkerboard pattern:
+            vec2 scaled_pos = ceil(gl_GlobalInvocationID.xy / local_constants.scale);
+            float color = mod(scaled_pos.x + scaled_pos.y, local_constants.modulo);
+            
+            imageStore(destination_texture, pos, vec4(color.rrr, 1));
+        }
+    

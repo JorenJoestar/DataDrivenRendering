@@ -37,8 +37,8 @@ struct FileBrowser {
     hydra::StringArray              files;
     hydra::StringArray              directories;
 
-    StringBuffer                    current_working_directory;
-    StringBuffer                    current_filename;
+    hydra::StringBuffer             current_working_directory;
+    hydra::StringBuffer             current_filename;
     const char*                     last_selected_filename                  = nullptr;
 
     FileSingleClicked               file_single_clicked_callback            = nullptr;
@@ -92,8 +92,8 @@ struct MaterialSystemApplication : public hydra::Application {
 
     hydra::ResourceManager          resource_manager;
 
-    StringBuffer                    ui_string_buffer;
-    StringBuffer                    parsing_string_buffer;
+    hydra::StringBuffer             ui_string_buffer;
+    hydra::StringBuffer             parsing_string_buffer;
 
     hydra::StringArray              render_pipeline_string_array;
 
@@ -109,8 +109,8 @@ struct MaterialSystemApplication : public hydra::Application {
     FileBrowser                     file_browser;
     FileBrowser                     choose_file_browser;
 
-    StringBuffer                    material_filename;
-    StringBuffer                    opened_file_path;
+    hydra::StringBuffer             material_filename;
+    hydra::StringBuffer             opened_file_path;
 
     FileType                        opened_file_type;
     char*                           file_text               = nullptr;

@@ -110,6 +110,7 @@ void MaterialSystemApplication::app_init() {
         pass0_stage->num_output_textures = 1;
         pass0_stage->output_textures = new graphics::TextureHandle[1];
         pass0_stage->output_textures[0] = string_hash_get( shadertoy_render_pipeline.name_to_texture, texture_name );
+        pass0_stage->resize_output = 1;
         char stage_name[32] = "pass0";
         pass0_stage->init();
         string_hash_put( shadertoy_render_pipeline.name_to_stage, stage_name, pass0_stage );
@@ -122,6 +123,7 @@ void MaterialSystemApplication::app_init() {
         final_stage->input_textures = new graphics::TextureHandle[1];
         final_stage->input_textures[0] = string_hash_get( shadertoy_render_pipeline.name_to_texture, texture_name );
         final_stage->num_output_textures = 0;
+        final_stage->resize_output = 1;
         final_stage->init();
         char final_stage_name[32] = "final";
         string_hash_put( shadertoy_render_pipeline.name_to_stage, final_stage_name, final_stage );
@@ -164,6 +166,7 @@ void MaterialSystemApplication::app_init() {
         pass0_stage->pool_id = render_stage_pool_id;
         pass0_stage->num_input_textures = 0;
         pass0_stage->num_output_textures = 1;
+        pass0_stage->resize_output = 1;
         pass0_stage->output_textures = new graphics::TextureHandle[1];
         pass0_stage->output_textures[0] = string_hash_get( compute_post_render_pipeline.name_to_texture, texture_name );
         char stage_name[32] = "compute0";
@@ -178,6 +181,7 @@ void MaterialSystemApplication::app_init() {
         final_stage->input_textures = new graphics::TextureHandle[1];
         final_stage->input_textures[0] = string_hash_get( compute_post_render_pipeline.name_to_texture, texture_name );
         final_stage->num_output_textures = 0;
+        final_stage->resize_output = 1;
         final_stage->init();
         char final_stage_name[32] = "final";
         string_hash_put( compute_post_render_pipeline.name_to_stage, final_stage_name, final_stage );
@@ -203,6 +207,7 @@ void MaterialSystemApplication::app_init() {
         final_stage->clear_color[1] = 0.05f;
         final_stage->clear_color[2] = 0.00f;
         final_stage->clear_color[3] = 1.0f;
+        final_stage->resize_output = 1;
         
         final_stage->init();
         char final_stage_name[32] = "final";
@@ -217,7 +222,7 @@ void MaterialSystemApplication::app_init() {
 
     editor_material.material = nullptr;
 
-    load_material( "SimpleFullscreen.hmt" );
+    load_material( "StarNest.hmt" );
 }
 
 void MaterialSystemApplication::app_terminate() {
@@ -568,7 +573,20 @@ void MaterialSystemApplication::file_action_popup_render( const char* filename )
 
 void MaterialSystemApplication::load_material( const char* filename ) {
 
-    hydra::graphics::RenderPipeline* render_pipeline = string_hash_get( name_to_render_pipeline, "Default" );
+    hydra::graphics::RenderPipeline* render_pipeline = nullptr;
+
+    if ( strcmp(filename, "SimpleFullscreen.hmt") == 0 ) {
+        render_pipeline = string_hash_get( name_to_render_pipeline, "swapchain" );
+    }
+    else if ( strcmp( filename, "StarNest.hmt" ) == 0 ) {
+        render_pipeline = string_hash_get( name_to_render_pipeline, "ShaderToy" );
+    }
+
+    if ( !render_pipeline ) {
+        hydra::print_format( "Cannot find pipeline Default. Cannot load material %s.\n", filename );
+        return;
+    }
+
     current_render_pipeline = render_pipeline;
 
     hydra::Resource* material_resource = resource_manager.load_resource( hydra::ResourceType::Material, filename, gfx_device, render_pipeline );
@@ -921,4 +939,14 @@ void FileBrowser::set_double_click_callback( FileDoubleClicked callback, void* u
 void FileBrowser::set_popup_showing_callback( PopupShowing callback, void* user_data ) {
     popup_showing_callback = callback;
     popup_showing_callback_user_data = user_data;
+}
+
+
+
+int main(int argc, char** argv) {
+
+    MaterialSystemApplication material_application;
+    material_application.main_loop();
+
+    return 0;
 }

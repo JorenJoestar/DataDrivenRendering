@@ -1,5 +1,5 @@
 //
-// Hydra Lib - v0.03
+// Hydra Lib - v0.05
 
 
 #include "hydra_lib.h"
@@ -21,6 +21,12 @@
 #define STB_LEAKCHECK_IMPLEMENTATION
 #include "stb_leakcheck.h"
 #endif // HY_STB_LEAKCHECK
+
+#if defined(HY_LOG)
+    #define HYDRA_LOG                   hydra::print_format
+#else
+    #define HYDRA_LOG                   printf
+#endif
 
 namespace hydra {
 
@@ -107,23 +113,6 @@ static long GetFileSize( FileHandle f ) {
     return fileSizeSigned;
 }
 
-void read_file( cstring filename, cstring mode, Buffer& memory ) {
-    FileHandle f;
-    open_file( filename, mode, &f );
-    if ( !f )
-        return;
-
-    long fileSizeSigned = GetFileSize( f );
-
-    //memory.resize( fileSizeSigned );
-    array_set_length( memory, fileSizeSigned + 1 );
-
-    size_t readsize = fread( &memory[0], 1, fileSizeSigned, f );
-    memory[readsize] = 0;
-    fclose( f );
-}
-
-
 FileTime get_last_write_time( cstring filename ) {
 #if defined(_WIN64)
     FILETIME lastWriteTime = {};
@@ -144,6 +133,24 @@ uint32_t get_full_path_name( cstring path, char* out_full_path, uint32_t max_siz
 #if defined(_WIN64)
     return GetFullPathName( path, max_size, out_full_path, nullptr );
 #endif // _WIN64
+}
+
+#if defined (HY_STB)
+
+void read_file( cstring filename, cstring mode, Buffer& memory ) {
+    FileHandle f;
+    open_file( filename, mode, &f );
+    if ( !f )
+        return;
+
+    long fileSizeSigned = GetFileSize( f );
+
+    //memory.resize( fileSizeSigned );
+    array_set_length( memory, fileSizeSigned + 1 );
+
+    size_t readsize = fread( &memory[0], 1, fileSizeSigned, f );
+    memory[readsize] = 0;
+    fclose( f );
 }
 
 void find_files_in_path( cstring file_pattern, StringArray& files ) {
@@ -185,6 +192,7 @@ void find_files_in_path( cstring extension, cstring search_pattern, StringArray&
     }
 }
 
+#endif // HY_STB
 
 char* read_file_into_memory( const char* filename, size_t* size ) {
     char* text = 0;
@@ -263,12 +271,8 @@ bool execute_process( cstring working_directory, cstring process_fullpath, cstri
     } else {
         win32_get_error( &s_process_log_buffer[0], k_process_log_buffer );
 
-#if defined(HY_LOG)
-        // Use the custom print - this outputs also to Visual Studio output window.
-        print_format( "Error Compiling: %s\n", s_process_log_buffer );
-#else
-        printf( "Error Compiling: %s\n", s_process_log_buffer );
-#endif // HY_LOG
+        HYDRA_LOG( "Execute process error.\n Exe: \"%s\" - Args: \"%s\" - Work_dir: \"%s\"\n", process_fullpath, arguments, working_directory );
+        HYDRA_LOG( "Message: %s\n", s_process_log_buffer );
 
         return false;
     }
@@ -280,36 +284,90 @@ bool execute_process( cstring working_directory, cstring process_fullpath, cstri
 
 // Time /////////////////////////////////////////////////////////////////////////
 #if defined (HY_TIME)
-LARGE_INTEGER s_frequency;
+// Cached frequency.
+// From Microsoft Docs: (https://docs.microsoft.com/en-us/windows/win32/api/profileapi/nf-profileapi-queryperformancefrequency)
+// "The frequency of the performance counter is fixed at system boot and is consistent across all processors. 
+// Therefore, the frequency need only be queried upon application initialization, and the result can be cached."
 
+static LARGE_INTEGER s_frequency;
+
+//
+//
 void time_service_init() {
     QueryPerformanceFrequency(&s_frequency);
+}
+
+//
+//
+void time_service_terminate() {
 }
 
 // Taken from the Rust code base: https://github.com/rust-lang/rust/blob/3809bbf47c8557bd149b3e52ceb47434ca8378d5/src/libstd/sys_common/mod.rs#L124
 // Computes (value*numer)/denom without overflow, as long as both
 // (numer*denom) and the overall result fit into i64 (which is the case
 // for our time conversions).
-int64_t int64_mul_div( int64_t value, int64_t numer, int64_t denom ) {
-    int64_t q = value / denom;
-    int64_t r = value % denom;
+static int64_t int64_mul_div( int64_t value, int64_t numer, int64_t denom ) {
+    const int64_t q = value / denom;
+    const int64_t r = value % denom;
     // Decompose value as (value/denom*denom + value%denom),
     // substitute into (value*numer)/denom and simplify.
     // r < denom, so (denom*numer) is the upper bound of (r*numer)
     return q * numer + r * numer / denom;
 }
 
-int64_t time_in_microseconds() {
-    // Get time and frequency
+//
+//
+int64_t time_now() {
+    // Get current time
     LARGE_INTEGER time;
     QueryPerformanceCounter( &time );
-    LARGE_INTEGER frequency;
-    QueryPerformanceFrequency( &frequency );
 
     // Convert to microseconds
-    const int64_t micros_per_second = 1000000LL;
-    int64_t micros = int64_mul_div( time.QuadPart, micros_per_second, frequency.QuadPart );
-    return micros;
+    // const int64_t microseconds_per_second = 1000000LL;
+    const int64_t microseconds = int64_mul_div( time.QuadPart, 1000000LL, s_frequency.QuadPart );
+    return microseconds;
+}
+
+//
+//
+int64_t time_from( int64_t starting_time ) {
+    return time_now() - starting_time;
+}
+
+//
+//
+double time_from_microseconds( int64_t starting_time ) {
+    return time_microseconds( time_from( starting_time ) );
+}
+
+//
+//
+double time_from_milliseconds( int64_t starting_time ) {
+    return time_milliseconds( time_from( starting_time ) );
+}
+
+//
+//
+double time_from_seconds( int64_t starting_time ) {
+    return time_seconds( time_from( starting_time ) );
+}
+
+//
+//
+double time_microseconds( int64_t time ) {
+    return (double)time;
+}
+
+//
+//
+double time_milliseconds( int64_t time ) {
+    return (double)time / 1000.0;
+}
+
+//
+//
+double time_seconds( int64_t time ) {
+    return (double)time / 1000000.0;
 }
 
 #endif // HY_TIME ///////////////////////////////////////////////////////////////
@@ -478,6 +536,8 @@ void StringBuffer::clear() {
 //
 // StringArray //////////////////////////////////////////////////////////////////
 
+#if defined(HY_STB)
+
 void init( StringArray& string_array, uint32_t size ) {
 
     string_array.data = (char*)hy_malloc( size );
@@ -533,6 +593,7 @@ const char* get_string( StringArray& string_array, uint32_t index ) {
     return string_array.data + (string_array.string_to_index[index].value);
 }
 
+#endif // HY_STB
 
 //
 // Memory ///////////////////////////////////////////////////////////////////////

@@ -1,5 +1,5 @@
 //
-//  Hydra Graphics - v0.044
+//  Hydra Graphics - v0.047
 
 #include "hydra_graphics.h"
 
@@ -8,9 +8,7 @@
 
 #if defined (HYDRA_SDL)
 #include <SDL.h>
-#include <SDL_vulkan.h>
-#endif // HYDRA_SDL
-
+#endif 
 // Malloc/free leak checking library
 #include "stb_leakcheck.h"
 
@@ -155,8 +153,6 @@ void Device::init( const DeviceCreation& creation ) {
 
     // 2. Perform backend specific code
     backend_init( creation );
-
-    //HYDRA_ASSERT( shaders, "Device: shader memory should be initialized!" );
 }
 
 void Device::terminate() {
@@ -164,19 +160,6 @@ void Device::terminate() {
     backend_terminate();
     
     s_string_buffer.terminate();
-
-}
-
-CommandBuffer* Device::create_command_buffer( QueueType::Enum type, uint32_t size, bool baked ) {
-    CommandBuffer* commands = (CommandBuffer*)malloc( sizeof( CommandBuffer ) );
-    commands->init( type, size, 256, baked );
-
-    return commands;
-}
-
-void Device::destroy_command_buffer( CommandBuffer* command_buffer ) {
-    command_buffer->terminate();
-    free( command_buffer );
 }
 
 BufferHandle Device::get_fullscreen_vertex_buffer() const {
@@ -201,162 +184,71 @@ void Device::resize( uint16_t width, uint16_t height ) {
     swapchain_height = height;
 }
 
-// CommandBuffer ////////////////////////////////////////////////////////////////
 
-void CommandBuffer::init( QueueType::Enum type, uint32_t buffer_size, uint32_t submit_size, bool baked ) {
-    this->type = type;
-    this->buffer_size = buffer_size;
-    this->baked = baked;
-
-    data = (uint8_t*)malloc( buffer_size );
-    read_offset = write_offset = 0;
-
-    this->max_submits = submit_size;
-    this->num_submits = 0;
-
-    this->submit_commands = (SubmitCommand*)malloc( sizeof(SubmitCommand) * submit_size );
+// Resource Access //////////////////////////////////////////////////////////////
+ShaderStateAPIGnostic* Device::access_shader( ShaderHandle shader ) {
+    return (ShaderStateAPIGnostic*)shaders.access_resource( shader.handle );
 }
 
-void CommandBuffer::terminate() {
-
-    free( data );
-    free( submit_commands );
-
-    read_offset = write_offset = buffer_size = 0;
-    max_submits = num_submits = 0;
+const ShaderStateAPIGnostic* Device::access_shader( ShaderHandle shader ) const {
+    return (const ShaderStateAPIGnostic*)shaders.access_resource( shader.handle );
 }
 
-void CommandBuffer::reset() {
-    read_offset = 0;
-
-    // Reset all writing properties.
-    if ( !baked ) {
-        write_offset = 0;
-        num_submits = 0;
-    }
+TextureAPIGnostic* Device::access_texture( TextureHandle texture ) {
+    return (TextureAPIGnostic*)textures.access_resource( texture.handle );
 }
 
-void CommandBuffer::begin_submit( uint64_t sort_key ) {
-
-    current_submit_command.key = sort_key;
-    current_submit_command.data = data + write_offset;
-
-    // Allocate space for size and sentinel 
-    current_submit_header = (commands::SubmitHeader*)current_submit_command.data;
-    current_submit_header->sentinel = k_submit_header_sentinel;
-    write_offset += sizeof( commands::SubmitHeader );
+const TextureAPIGnostic * Device::access_texture( TextureHandle texture ) const {
+    return (const TextureAPIGnostic*)textures.access_resource( texture.handle );
 }
 
-void CommandBuffer::end_submit() {
-
-    current_submit_header = (commands::SubmitHeader*)current_submit_command.data;
-    // Calculate final submit packed size - removing the additional header.
-    current_submit_header->data_size = (data + write_offset) - current_submit_command.data - sizeof( commands::SubmitHeader );
-
-    submit_commands[num_submits++] = current_submit_command;
-
-    current_submit_command.key = 0xffffffffffffffff;
-    current_submit_command.data = nullptr;
+BufferAPIGnostic* Device::access_buffer( BufferHandle buffer ) {
+    return (BufferAPIGnostic*)buffers.access_resource( buffer.handle );
 }
 
-void CommandBuffer::begin_pass( RenderPassHandle handle ) {
-    commands::BeginPass* bind = write_command<commands::BeginPass>();
-    bind->handle = handle;
+const BufferAPIGnostic* Device::access_buffer( BufferHandle buffer ) const {
+    return (const BufferAPIGnostic*)buffers.access_resource( buffer.handle );
 }
 
-void CommandBuffer::end_pass() {
-    // No arguments -- empty.
-    write_command<commands::EndPass>();
+PipelineAPIGnostic* Device::access_pipeline( PipelineHandle pipeline ) {
+    return (PipelineAPIGnostic*)pipelines.access_resource( pipeline.handle );
 }
 
-void CommandBuffer::bind_pipeline( PipelineHandle handle ) {
-    commands::BindPipeline* bind = write_command<commands::BindPipeline>();
-    bind->handle = handle;
+const PipelineAPIGnostic* Device::access_pipeline( PipelineHandle pipeline ) const {
+    return (const PipelineAPIGnostic*)pipelines.access_resource( pipeline.handle );
 }
 
-void CommandBuffer::bind_vertex_buffer( BufferHandle handle, uint32_t binding, uint32_t offset ) {
-    commands::BindVertexBuffer* bind = write_command< commands::BindVertexBuffer>();
-    bind->buffer = handle;
-    bind->binding = binding;
-    bind->byte_offset = offset;
+SamplerAPIGnostic* Device::access_sampler( SamplerHandle sampler ) {
+    return (SamplerAPIGnostic*)samplers.access_resource( sampler.handle );
 }
 
-void CommandBuffer::bind_index_buffer( BufferHandle handle ) {
-    commands::BindIndexBuffer* bind = write_command< commands::BindIndexBuffer>();
-    bind->buffer = handle;
+const SamplerAPIGnostic* Device::access_sampler( SamplerHandle sampler ) const {
+    return (const SamplerAPIGnostic*)samplers.access_resource( sampler.handle );
 }
 
-void CommandBuffer::bind_resource_list( ResourceListHandle* handle, uint32_t num_lists, uint32_t* offsets, uint32_t num_offsets ) {
-    commands::BindResourceList* bind = write_command<commands::BindResourceList>();
-    
-    for ( uint32_t l = 0; l < num_lists; ++l ) {
-        bind->handles[l] = handle[l];
-    }
-
-    for ( uint32_t l = 0; l < num_offsets; ++l ) {
-        bind->offsets[l] = offsets[l];
-    }
-
-    bind->num_lists = num_lists;
-    bind->num_offsets = num_offsets;
+ResourceListLayoutAPIGnostic* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
+    return (ResourceListLayoutAPIGnostic*)resource_list_layouts.access_resource( resource_layout.handle );
 }
 
-void CommandBuffer::set_viewport( const Viewport& viewport ) {
-    commands::SetViewport* set = write_command<commands::SetViewport>();
-    set->viewport = viewport;
+const ResourceListLayoutAPIGnostic* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) const {
+    return (const ResourceListLayoutAPIGnostic*)resource_list_layouts.access_resource( resource_layout.handle );
 }
 
-void CommandBuffer::set_scissor( const Rect2D& rect ) {
-    commands::SetScissor* set = write_command<commands::SetScissor>();
-    set->rect = rect;
+ResourceListAPIGnostic* Device::access_resource_list( ResourceListHandle resource_list ) {
+    return (ResourceListAPIGnostic*)resource_lists.access_resource( resource_list.handle );
 }
 
-void CommandBuffer::clear( float red, float green, float blue, float alpha ) {
-    commands::Clear* clear = write_command<commands::Clear>();
-    clear->clear_color[0] = red;
-    clear->clear_color[1] = green;
-    clear->clear_color[2] = blue;
-    clear->clear_color[3] = alpha;
+const ResourceListAPIGnostic* Device::access_resource_list( ResourceListHandle resource_list ) const {
+    return (const ResourceListAPIGnostic*)resource_lists.access_resource( resource_list.handle );
 }
 
-void CommandBuffer::clear_depth( float value ) {
-    commands::ClearDepth* clear = write_command<commands::ClearDepth>();
-    clear->value = value;
+RenderPassAPIGnostic* Device::access_render_pass( RenderPassHandle render_pass ) {
+    return (RenderPassAPIGnostic*)render_passes.access_resource( render_pass.handle );
 }
 
-void CommandBuffer::clear_stencil( uint8_t value ) {
-    commands::ClearStencil* clear = write_command<commands::ClearStencil>();
-    clear->value = value;
+const RenderPassAPIGnostic* Device::access_render_pass( RenderPassHandle render_pass ) const {
+    return (const RenderPassAPIGnostic*)render_passes.access_resource( render_pass.handle );
 }
-
-void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t count, uint32_t instance_count ) {
-    commands::Draw* draw_command = write_command<commands::Draw>();
-
-    draw_command->topology = topology;
-    draw_command->first_vertex = start;
-    draw_command->vertex_count = count;
-    draw_command->instance_count = instance_count;
-}
-
-void CommandBuffer::drawIndexed( TopologyType::Enum topology, uint32_t index_count, uint32_t instance_count,
-                                 uint32_t first_index, int32_t vertex_offset, uint32_t first_instance ) {
-    commands::DrawIndexed* draw_command = write_command<commands::DrawIndexed>();
-
-    draw_command->topology = topology;
-    draw_command->index_count = index_count;
-    draw_command->instance_count = instance_count;
-    draw_command->first_index = first_index;
-    draw_command->vertex_offset = vertex_offset;
-    draw_command->first_instance = first_instance;
-}
-
-void CommandBuffer::dispatch( uint32_t group_x, uint32_t group_y, uint32_t group_z ) {
-    commands::Dispatch* command = write_command<commands::Dispatch>();
-    command->group_x = (uint16_t)group_x;
-    command->group_y = (uint16_t)group_y;
-    command->group_z = (uint16_t)group_z;
-}
-
 
 // API Specific /////////////////////////////////////////////////////////////////
 
@@ -366,7 +258,6 @@ void CommandBuffer::dispatch( uint32_t group_x, uint32_t group_y, uint32_t group
 #if defined (HYDRA_OPENGL)
 
 // Defines
-// TODO: until enums are not exported anymore, add + 1, max is not count!
 
 // Enum translations. Use tables or switches depending on the case.
 static GLuint to_gl_target( TextureType::Enum type ) {
@@ -1151,6 +1042,12 @@ void Device::backend_init( const DeviceCreation& creation ) {
     resource_list_layouts.init( 128, sizeof( ResourceListLayoutGL ) );
     resource_lists.init( 128, sizeof( ResourceListGL ) );
     render_passes.init( 256, sizeof( RenderPassGL ) );
+    command_buffers.init( 32, sizeof( CommandBuffer ) );
+
+    for ( size_t i = 0; i < 32; i++ ) {
+        CommandBuffer* command_buffer = (CommandBuffer*)command_buffers.access_resource(i);
+        command_buffer->init( QueueType::Graphics, 10000, 1000, false );
+    }
 
     // During init, enable debug output
     glEnable( GL_DEBUG_OUTPUT );
@@ -1201,6 +1098,11 @@ void Device::backend_terminate() {
 
     free( device_state );
 
+    for ( size_t i = 0; i < 32; i++ ) {
+        CommandBuffer* command_buffer = (CommandBuffer*)command_buffers.access_resource( i );
+        command_buffer->terminate();
+    }
+
     pipelines.terminate();
     buffers.terminate();
     shaders.terminate();
@@ -1209,71 +1111,7 @@ void Device::backend_terminate() {
     resource_list_layouts.terminate();
     resource_lists.terminate();
     render_passes.terminate();
-}
-
-// Resource Access //////////////////////////////////////////////////////////////
-ShaderStateGL* Device::access_shader( ShaderHandle shader ) {
-    return (ShaderStateGL*)shaders.access_resource( shader.handle );
-}
-
-const ShaderStateGL* Device::access_shader( ShaderHandle shader ) const {
-    return (const ShaderStateGL*)shaders.access_resource( shader.handle );
-}
-
-TextureGL* Device::access_texture( TextureHandle texture ) {
-    return (TextureGL*)textures.access_resource( texture.handle );
-}
-
-const TextureGL * Device::access_texture( TextureHandle texture ) const {
-    return (const TextureGL*)textures.access_resource( texture.handle );
-}
-
-BufferGL* Device::access_buffer( BufferHandle buffer ) {
-    return (BufferGL*)buffers.access_resource( buffer.handle );
-}
-
-const BufferGL* Device::access_buffer( BufferHandle buffer ) const {
-    return (const BufferGL*)buffers.access_resource( buffer.handle );
-}
-
-PipelineGL* Device::access_pipeline( PipelineHandle pipeline ) {
-    return (PipelineGL*)pipelines.access_resource( pipeline.handle );
-}
-
-const PipelineGL* Device::access_pipeline( PipelineHandle pipeline ) const {
-    return (const PipelineGL*)pipelines.access_resource( pipeline.handle );
-}
-
-SamplerGL* Device::access_sampler( SamplerHandle sampler ) {
-    return (SamplerGL*)samplers.access_resource( sampler.handle );
-}
-
-const SamplerGL* Device::access_sampler( SamplerHandle sampler ) const {
-    return (const SamplerGL*)samplers.access_resource( sampler.handle );
-}
-
-ResourceListLayoutGL* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
-    return (ResourceListLayoutGL*)resource_list_layouts.access_resource( resource_layout.handle );
-}
-
-const ResourceListLayoutGL* Device::access_resource_list_layout( ResourceListLayoutHandle resource_layout ) const {
-    return (const ResourceListLayoutGL*)resource_list_layouts.access_resource( resource_layout.handle );
-}
-
-ResourceListGL* Device::access_resource_list( ResourceListHandle resource_list ) {
-    return (ResourceListGL*)resource_lists.access_resource( resource_list.handle );
-}
-
-const ResourceListGL* Device::access_resource_list( ResourceListHandle resource_list ) const {
-    return (const ResourceListGL*)resource_lists.access_resource( resource_list.handle );
-}
-
-RenderPassGL* Device::access_render_pass( RenderPassHandle render_pass ) {
-    return (RenderPassGL*)render_passes.access_resource( render_pass.handle );
-}
-
-const RenderPassGL* Device::access_render_pass( RenderPassHandle render_pass ) const {
-    return (const RenderPassGL*)render_passes.access_resource( render_pass.handle );
+    command_buffers.terminate();
 }
 
 void Device::link_texture_sampler( TextureHandle texture, SamplerHandle sampler ) {
@@ -1435,19 +1273,18 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
     if ( handle.handle == k_invalid_handle ) {
         return handle;
     }
-
-    PipelineGL* pipeline = access_pipeline( handle );
-
+    
     // Create all necessary resources
     ShaderHandle shader_state = create_shader( creation.shaders );
     if ( shader_state.handle == k_invalid_handle ) {
         // Shader did not compile.
-        pipelines.release_resource( handle.handle );
         handle.handle = k_invalid_handle;
 
         return handle;
     }
 
+    // Now that shaders have compiled we can create the pipeline.
+    PipelineGL* pipeline = access_pipeline( handle );
     ShaderStateGL* shader_state_data = access_shader( shader_state );
 
     pipeline->shader_state = shader_state;
@@ -1630,6 +1467,7 @@ ResourceListHandle Device::create_resource_list( const ResourceListCreation& cre
                 break;
             }
 
+            case ResourceType::Buffer:
             case ResourceType::Constants:
             {
                 BufferHandle buffer_handle = { creation.resources[r].handle };
@@ -1639,6 +1477,7 @@ ResourceListHandle Device::create_resource_list( const ResourceListCreation& cre
             }
 
             default:
+                HYDRA_LOG( "Binding not supported %s\n", ResourceType::ToString( (ResourceType::Enum)binding.type ) );
                 break;
         }
     }
@@ -1897,6 +1736,23 @@ void Device::queue_command_buffer( CommandBuffer* command_buffer ) {
     queued_command_buffers[num_queued_command_buffers++] = command_buffer;
 }
 
+CommandBuffer* Device::get_command_buffer( QueueType::Enum type, uint32_t size, bool baked ) {
+    uint32_t handle = command_buffers.obtain_resource();
+    if ( handle != k_invalid_handle ) {
+        CommandBuffer* command_buffer = (CommandBuffer*)command_buffers.access_resource( handle );
+        command_buffer->handle = handle;
+        command_buffer->swapchain_frame_issued = 0;
+        command_buffer->baked = baked;
+
+        return command_buffer;
+    }
+    return nullptr;
+}
+
+void Device::free_command_buffer( CommandBuffer* command_buffer ) {
+    command_buffers.release_resource( command_buffer->handle );
+}
+
 void Device::present() {
 
     // TODO:
@@ -1915,7 +1771,11 @@ void Device::present() {
         }
 
         command_buffer->reset();
+
+        if ( !command_buffer->baked )
+            command_buffers.release_resource( command_buffer->handle );
     }
+    
 
     // TODO: missing implementation.
     // Sort them
@@ -2320,6 +2180,161 @@ void DeviceStateGL::apply()  {
 
 }
 
+// CommandBuffer ////////////////////////////////////////////////////////////////
+
+void CommandBuffer::init( QueueType::Enum type, uint32_t buffer_size, uint32_t submit_size, bool baked ) {
+    this->type = type;
+    this->buffer_size = buffer_size;
+    this->baked = baked;
+
+    data = (uint8_t*)malloc( buffer_size );
+    read_offset = write_offset = 0;
+
+    this->max_submits = submit_size;
+    this->num_submits = 0;
+
+    this->submit_commands = (SubmitCommand*)malloc( sizeof( SubmitCommand ) * submit_size );
+}
+
+void CommandBuffer::terminate() {
+
+    free( data );
+    free( submit_commands );
+
+    read_offset = write_offset = buffer_size = 0;
+    max_submits = num_submits = 0;
+}
+
+void CommandBuffer::reset() {
+    read_offset = 0;
+
+    // Reset all writing properties.
+    if ( !baked ) {
+        write_offset = 0;
+        num_submits = 0;
+    }
+}
+
+void CommandBuffer::begin_submit( uint64_t sort_key ) {
+
+    current_submit_command.key = sort_key;
+    current_submit_command.data = data + write_offset;
+
+    // Allocate space for size and sentinel 
+    current_submit_header = ( commands::SubmitHeader* )current_submit_command.data;
+    current_submit_header->sentinel = k_submit_header_sentinel;
+    write_offset += sizeof( commands::SubmitHeader );
+}
+
+void CommandBuffer::end_submit() {
+
+    current_submit_header = ( commands::SubmitHeader* )current_submit_command.data;
+    // Calculate final submit packed size - removing the additional header.
+    current_submit_header->data_size = ( data + write_offset ) - current_submit_command.data - sizeof( commands::SubmitHeader );
+
+    submit_commands[num_submits++] = current_submit_command;
+
+    current_submit_command.key = 0xffffffffffffffff;
+    current_submit_command.data = nullptr;
+}
+
+void CommandBuffer::begin_pass( RenderPassHandle handle ) {
+    commands::BeginPass* bind = write_command<commands::BeginPass>();
+    bind->handle = handle;
+}
+
+void CommandBuffer::end_pass() {
+    // No arguments -- empty.
+    write_command<commands::EndPass>();
+}
+
+void CommandBuffer::bind_pipeline( PipelineHandle handle ) {
+    commands::BindPipeline* bind = write_command<commands::BindPipeline>();
+    bind->handle = handle;
+}
+
+void CommandBuffer::bind_vertex_buffer( BufferHandle handle, uint32_t binding, uint32_t offset ) {
+    commands::BindVertexBuffer* bind = write_command< commands::BindVertexBuffer>();
+    bind->buffer = handle;
+    bind->binding = binding;
+    bind->byte_offset = offset;
+}
+
+void CommandBuffer::bind_index_buffer( BufferHandle handle ) {
+    commands::BindIndexBuffer* bind = write_command< commands::BindIndexBuffer>();
+    bind->buffer = handle;
+}
+
+void CommandBuffer::bind_resource_list( ResourceListHandle* handle, uint32_t num_lists, uint32_t* offsets, uint32_t num_offsets ) {
+    commands::BindResourceList* bind = write_command<commands::BindResourceList>();
+
+    for ( uint32_t l = 0; l < num_lists; ++l ) {
+        bind->handles[l] = handle[l];
+    }
+
+    for ( uint32_t l = 0; l < num_offsets; ++l ) {
+        bind->offsets[l] = offsets[l];
+    }
+
+    bind->num_lists = num_lists;
+    bind->num_offsets = num_offsets;
+}
+
+void CommandBuffer::set_viewport( const Viewport& viewport ) {
+    commands::SetViewport* set = write_command<commands::SetViewport>();
+    set->viewport = viewport;
+}
+
+void CommandBuffer::set_scissor( const Rect2D& rect ) {
+    commands::SetScissor* set = write_command<commands::SetScissor>();
+    set->rect = rect;
+}
+
+void CommandBuffer::clear( float red, float green, float blue, float alpha ) {
+    commands::Clear* clear = write_command<commands::Clear>();
+    clear->clear_color[0] = red;
+    clear->clear_color[1] = green;
+    clear->clear_color[2] = blue;
+    clear->clear_color[3] = alpha;
+}
+
+void CommandBuffer::clear_depth( float value ) {
+    commands::ClearDepth* clear = write_command<commands::ClearDepth>();
+    clear->value = value;
+}
+
+void CommandBuffer::clear_stencil( uint8_t value ) {
+    commands::ClearStencil* clear = write_command<commands::ClearStencil>();
+    clear->value = value;
+}
+
+void CommandBuffer::draw( TopologyType::Enum topology, uint32_t start, uint32_t count, uint32_t instance_count ) {
+    commands::Draw* draw_command = write_command<commands::Draw>();
+
+    draw_command->topology = topology;
+    draw_command->first_vertex = start;
+    draw_command->vertex_count = count;
+    draw_command->instance_count = instance_count;
+}
+
+void CommandBuffer::drawIndexed( TopologyType::Enum topology, uint32_t index_count, uint32_t instance_count,
+                                 uint32_t first_index, int32_t vertex_offset, uint32_t first_instance ) {
+    commands::DrawIndexed* draw_command = write_command<commands::DrawIndexed>();
+
+    draw_command->topology = topology;
+    draw_command->index_count = index_count;
+    draw_command->instance_count = instance_count;
+    draw_command->first_index = first_index;
+    draw_command->vertex_offset = vertex_offset;
+    draw_command->first_instance = first_instance;
+}
+
+void CommandBuffer::dispatch( uint32_t group_x, uint32_t group_y, uint32_t group_z ) {
+    commands::Dispatch* command = write_command<commands::Dispatch>();
+    command->group_x = (uint16_t)group_x;
+    command->group_y = (uint16_t)group_y;
+    command->group_z = (uint16_t)group_z;
+}
 
 // Utility methods //////////////////////////////////////////////////////////////
 
@@ -2632,7 +2647,7 @@ void test_pool( Device & device ) {
 }
 
 void test_command_buffer( Device& device ) {
-    graphics::CommandBuffer* commands = device.create_command_buffer( graphics::QueueType::Graphics, 1024, false );
+    graphics::CommandBuffer* commands = device.get_command_buffer( graphics::QueueType::Graphics, 1024, false );
 
     commands->draw( graphics::TopologyType::Triangle, 0, 3 );
 
@@ -2644,596 +2659,7 @@ void test_command_buffer( Device& device ) {
     HYDRA_ASSERT( draw.size == sizeof( commands::Draw ), "Size should be %u instead of %u", sizeof( commands::Draw ), draw.size );
 }
 
-
-// Vulkan ///////////////////////////////////////////////////////////////////////
-
-#elif defined (HYDRA_VULKAN)
-
-static const char* s_wanted_extensions[] = {
-    VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_MACOS_MVK
-        VK_MVK_MACOS_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_XCB_KHR
-        VK_KHR_XCB_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_ANDROID_KHR
-        VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_XLIB_KHR
-        VK_KHR_XLIB_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_XCB_KHR
-        VK_KHR_XCB_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_WAYLAND_KHR
-        VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_MIR_KHR || VK_USE_PLATFORM_DISPLAY_KHR
-        VK_KHR_DISPLAY_EXTENSION_NAME
-#elif VK_USE_PLATFORM_ANDROID_KHR
-        VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
-#elif VK_USE_PLATFORM_IOS_MVK
-        VK_MVK_IOS_SURFACE_EXTENSION_NAME
-#endif
-};
-
-#define VULKAN_DEBUG_REPORT
-
-#ifdef VULKAN_DEBUG_REPORT
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback( VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object, size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage, void* pUserData ) {
-    (void)flags; (void)object; (void)location; (void)messageCode; (void)pUserData; (void)pLayerPrefix; // Unused arguments
-    HYDRA_LOG( "[vulkan] ObjectType: %i\nMessage: %s\n\n", objectType, pMessage );
-    return VK_FALSE;
-}
-#endif // VULKAN_DEBUG_REPORT
-
-
-static void                         check( VkResult result );
-static VkSurfaceFormatKHR           choose_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface, const VkFormat* request_formats, int request_formats_count, VkColorSpaceKHR request_color_space );
-static VkPresentModeKHR             choose_present_mode( VkPhysicalDevice physical_device, VkSurfaceKHR surface, const VkPresentModeKHR* request_modes, int request_modes_count );
-
-
-void Device::backend_init( const DeviceCreation& creation ) {
-    
-    // 1. Init Vulkan instance.
-    VkInstanceCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info.enabledExtensionCount = 0;
-    create_info.ppEnabledExtensionNames = nullptr;
-    create_info.enabledLayerCount = 0;
-    create_info.ppEnabledLayerNames = nullptr;
-
-    VkResult result;
-
-    // 1.1. Choose extensions
-#ifdef VULKAN_DEBUG_REPORT
-    // Enabling multiple validation layers grouped as LunarG standard validation
-    const char* layers[] = { "VK_LAYER_LUNARG_standard_validation" };
-    create_info.enabledLayerCount = 1;
-    create_info.ppEnabledLayerNames = layers;
-
-    const char* extensions[] = { "VK_EXT_debug_report" };
-    create_info.enabledExtensionCount = 1;
-    create_info.ppEnabledExtensionNames = extensions;
-
-    vulkan_allocation_callbacks = nullptr;
-
-    // Create Vulkan Instance
-    result = vkCreateInstance( &create_info, vulkan_allocation_callbacks, &vulkan_instance );
-    check( result );
-
-    // Create debug callback
-    auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr( vulkan_instance, "vkCreateDebugReportCallbackEXT" );
-    HYDRA_ASSERT( vkCreateDebugReportCallbackEXT != NULL, "" );
-
-    // Setup the debug report callback
-    VkDebugReportCallbackCreateInfoEXT debug_report_ci = {};
-    debug_report_ci.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    debug_report_ci.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-    debug_report_ci.pfnCallback = debug_callback;
-    debug_report_ci.pUserData = NULL;
-    result = vkCreateDebugReportCallbackEXT( vulkan_instance, &debug_report_ci, vulkan_allocation_callbacks, &vulkan_debug_callback );
-    check( result );
-#else
-    // Create Vulkan Instance without any debug feature
-    result = vkCreateInstance( &create_info, vulkan_allocation_callbacks, &vulkan_instance );
-    check( result );
-#endif
-
-    // 2. Choose physical device
-    uint32_t num_physical_device;
-    result = vkEnumeratePhysicalDevices( vulkan_instance, &num_physical_device, NULL );
-    check( result );
-
-    VkPhysicalDevice* gpus = (VkPhysicalDevice*)malloc( sizeof( VkPhysicalDevice ) * num_physical_device );
-    result = vkEnumeratePhysicalDevices( vulkan_instance, &num_physical_device, gpus );
-    check( result );
-
-    // TODO: create a 'isDeviceSuitable' method to choose the proper GPU.
-    vulkan_physical_device = gpus[0];
-    free( gpus );
-
-    //createLogicalDevice
-    uint32_t queue_family_count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties( vulkan_physical_device, &queue_family_count, nullptr );
-
-    VkQueueFamilyProperties* queue_families = (VkQueueFamilyProperties*)malloc( sizeof( VkQueueFamilyProperties ) * queue_family_count );
-    vkGetPhysicalDeviceQueueFamilyProperties( vulkan_physical_device, &queue_family_count, queue_families );
-
-    uint32_t family_index = 0;
-    for ( ; family_index < queue_family_count; ++family_index ) {
-        VkQueueFamilyProperties queue_family = queue_families[family_index];
-        if ( queue_family.queueCount > 0 && queue_family.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT) ) {
-            //indices.graphicsFamily = i;
-            break;
-        }
-
-        //VkBool32 presentSupport = false;
-        //vkGetPhysicalDeviceSurfaceSupportKHR( vulkan_physical_device, i, _surface, &presentSupport );
-        //if ( queue_family.queueCount && presentSupport ) {
-        //    indices.presentFamily = i;
-        //}
-
-        //if ( indices.isComplete() ) {
-        //    break;
-        //}
-    }
-
-    free( queue_families );
-
-    int device_extension_count = 1;
-    const char* device_extensions[] = { "VK_KHR_swapchain" };
-    const float queue_priority[] = { 1.0f };
-    VkDeviceQueueCreateInfo queue_info[1] = {};
-    queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info[0].queueFamilyIndex = family_index;
-    queue_info[0].queueCount = 1;
-    queue_info[0].pQueuePriorities = queue_priority;
-
-    VkDeviceCreateInfo device_create_info = {};
-    device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_create_info.queueCreateInfoCount = sizeof( queue_info ) / sizeof( queue_info[0] );
-    device_create_info.pQueueCreateInfos = queue_info;
-    device_create_info.enabledExtensionCount = device_extension_count;
-    device_create_info.ppEnabledExtensionNames = device_extensions;
-    result = vkCreateDevice( vulkan_physical_device, &device_create_info, vulkan_allocation_callbacks, &vulkan_device );
-    check( result );
-
-    vkGetDeviceQueue( vulkan_device, family_index, 0, &vulkan_queue );
-
-    vulkan_queue_family = family_index;
-
-    // Create pools
-    VkDescriptorPoolSize pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-    };
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * ArrayLength( pool_sizes );
-    pool_info.poolSizeCount = (uint32_t)ArrayLength( pool_sizes );
-    pool_info.pPoolSizes = pool_sizes;
-    result = vkCreateDescriptorPool( vulkan_device, &pool_info, vulkan_allocation_callbacks, &vulkan_descriptor_pool );
-    check( result );
-
-
-#if defined (HYDRA_SDL)
-
-    // Create surface
-    SDL_Window* window = (SDL_Window*)creation.window;
-    if ( SDL_Vulkan_CreateSurface( window, vulkan_instance, &vulkan_window_surface ) == 0 ) {
-        printf( "Failed to create Vulkan surface.\n" );
-        //return 1;
-    }
-
-    // Create Framebuffers
-    int window_width, window_height;
-    SDL_GetWindowSize( window, &window_width, &window_height );
-
-#endif // HYDRA_SDL
-
-    VkBool32 surface_supported;
-    vkGetPhysicalDeviceSurfaceSupportKHR( vulkan_physical_device, vulkan_queue_family, vulkan_window_surface, &surface_supported );
-    if ( surface_supported != VK_TRUE ) {
-        fprintf( stderr, "Error no WSI support on physical device 0\n" );
-    }
-
-    // Select Surface Format
-    const VkFormat surface_image_formats[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
-    const VkColorSpaceKHR surface_color_space = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-
-    vulkan_surface_format = choose_surface_format( vulkan_physical_device, vulkan_window_surface, surface_image_formats, ArrayLength( surface_image_formats ), surface_color_space );
-
-    //VkPresentModeKHR present_modes[] = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR };
-    VkPresentModeKHR present_modes[] = { VK_PRESENT_MODE_FIFO_KHR };
-    vulkan_present_mode = choose_present_mode( vulkan_physical_device, vulkan_window_surface, present_modes, ArrayLength( present_modes ) );
-
-
-    //createSurface();
-    //createSwapChain();
-
-
-#if defined (HYDRA_GRAPHICS_TEST)
-    test_texture_creation( *this );
-    test_pool( *this );
-    test_command_buffer( *this );
-#endif // HYDRA_GRAPHICS_TEST
-
-    //// Init pools
-    //shaders.init( 128, sizeof( ShaderStateGL ) );
-    //textures.init( 128, sizeof( TextureGL ) );
-    //buffers.init( 128, sizeof( BufferGL ) );
-    //pipelines.init( 128, sizeof( PipelineGL ) );
-    //samplers.init( 32, sizeof( SamplerGL ) );
-    //resource_list_layouts.init( 128, sizeof( ResourceListLayoutGL ) );
-    //resource_lists.init( 128, sizeof( ResourceListGL ) );
-    //render_passes.init( 256, sizeof( RenderPassGL ) );
-
-    //
-    // Init primitive resources
-    BufferCreation fullscreen_vb_creation = { BufferType::Vertex, ResourceUsageType::Immutable, 0, nullptr, "Fullscreen_vb" };
-    fullscreen_vertex_buffer = create_buffer( fullscreen_vb_creation );
-
-    RenderPassCreation swapchain_pass_creation = {};
-    swapchain_pass_creation.is_swapchain = true;
-    swapchain_pass = create_render_pass( swapchain_pass_creation );
-
-    // Init Dummy resources
-    TextureCreation dummy_texture_creation = { nullptr, 1, 1, 1, 1, 0, TextureFormat::R8_UINT, TextureType::Texture2D };
-    dummy_texture = create_texture( dummy_texture_creation );
-
-    BufferCreation dummy_constant_buffer_creation = { BufferType::Constant, ResourceUsageType::Immutable, 16, nullptr, "Dummy_cb" };
-    dummy_constant_buffer = create_buffer( dummy_constant_buffer_creation );
-
-    queued_command_buffers = (CommandBuffer**)malloc( sizeof( CommandBuffer* ) * 128 );
-}
-
-void Device::backend_terminate() {
-
-
-    free( queued_command_buffers );
-    destroy_buffer( fullscreen_vertex_buffer );
-    destroy_render_pass( swapchain_pass );
-    destroy_texture( dummy_texture );
-    destroy_buffer( dummy_constant_buffer );
-
-    pipelines.terminate();
-    buffers.terminate();
-    shaders.terminate();
-    textures.terminate();
-    samplers.terminate();
-    resource_list_layouts.terminate();
-    resource_lists.terminate();
-    render_passes.terminate();
-#ifdef VULKAN_DEBUG_REPORT
-    // Remove the debug report callback
-    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr( vulkan_instance, "vkDestroyDebugReportCallbackEXT" );
-    vkDestroyDebugReportCallbackEXT( vulkan_instance, vulkan_debug_callback, vulkan_allocation_callbacks );
-#endif // IMGUI_VULKAN_DEBUG_REPORT
-
-    vkDestroyDescriptorPool( vulkan_device, vulkan_descriptor_pool, vulkan_allocation_callbacks );
-
-    vkDestroyDevice( vulkan_device, vulkan_allocation_callbacks );
-    vkDestroyInstance( vulkan_instance, vulkan_allocation_callbacks );
-}
-
-
-// Resource Creation ////////////////////////////////////////////////////////////
-TextureHandle Device::create_texture( const TextureCreation& creation ) {
-
-    uint32_t resource_index = textures.obtain_resource();
-    TextureHandle handle = { resource_index };
-    if ( resource_index == k_invalid_handle ) {
-        return handle;
-    }
-
-    return handle;
-}
-
-PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
-    PipelineHandle handle = { pipelines.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-
-    return handle;
-}
-
-BufferHandle Device::create_buffer( const BufferCreation& creation ) {
-    BufferHandle handle = { buffers.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-
-    return handle;
-}
-
-SamplerHandle Device::create_sampler( const SamplerCreation& creation ) {
-    SamplerHandle handle = { samplers.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-
-    return handle;
-}
-
-ResourceListLayoutHandle Device::create_resource_list_layout( const ResourceListLayoutCreation& creation ) {
-    ResourceListLayoutHandle handle = { resource_list_layouts.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-
-    return handle;
-}
-
-ResourceListHandle Device::create_resource_list( const ResourceListCreation& creation ) {
-    ResourceListHandle handle = { resource_lists.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-
-    return handle;
-}
-
-RenderPassHandle Device::create_render_pass( const RenderPassCreation& creation ) {
-    RenderPassHandle handle = { render_passes.obtain_resource() };
-    if ( handle.handle == k_invalid_handle ) {
-        return handle;
-    }
-
-    return handle;
-}
-
-// Resource Destruction /////////////////////////////////////////////////////////
-
-void Device::destroy_buffer( BufferHandle buffer ) {
-    if ( buffer.handle != k_invalid_handle ) {
-        //BufferGL* gl_buffer = access_buffer( buffer );
-        //if ( gl_buffer ) {
-        //    glDeleteBuffers( 1, &gl_buffer->gl_handle );
-        //}
-
-        //buffers.release_resource( buffer.handle );
-    }
-}
-
-void Device::destroy_texture( TextureHandle texture ) {
-
-    if ( texture.handle != k_invalid_handle ) {
-        //TextureGL* texture_data = access_texture( texture );
-        //if ( texture_data ) {
-        //    glDeleteTextures( 1, &texture_data->gl_handle );
-        //}
-        //textures.release_resource( texture.handle );
-    }
-}
-
-void Device::destroy_pipeline( PipelineHandle pipeline ) {
-    if ( pipeline.handle != k_invalid_handle ) {
-
-        pipelines.release_resource( pipeline.handle );
-    }
-}
-
-void Device::destroy_sampler( SamplerHandle sampler ) {
-    if ( sampler.handle != k_invalid_handle ) {
-
-        samplers.release_resource( sampler.handle );
-    }
-}
-
-void Device::destroy_resource_list_layout( ResourceListLayoutHandle resource_layout ) {
-    if ( resource_layout.handle != k_invalid_handle ) {
-        //ResourceListLayoutGL* state = access_resource_list_layout( resource_layout );
-        //free( state->bindings );
-        //resource_list_layouts.release_resource( resource_layout.handle );
-    }
-}
-
-void Device::destroy_resource_list( ResourceListHandle resource_list ) {
-    if ( resource_list.handle != k_invalid_handle ) {
-        //ResourceListGL* state = access_resource_list( resource_list );
-        //free( state->resources );
-        //resource_lists.release_resource( resource_list.handle );
-    }
-}
-
-void Device::destroy_render_pass( RenderPassHandle render_pass ) {
-    if ( render_pass.handle != k_invalid_handle ) {
-
-        render_passes.release_resource( render_pass.handle );
-    }
-}
-
-// Resource Description Query ///////////////////////////////////////////////////
-
-void Device::query_buffer( BufferHandle buffer, BufferDescription& out_description ) {
-    if ( buffer.handle != k_invalid_handle ) {
-        //const BufferGL* buffer_data = access_buffer( buffer );
-
-        //out_description.name = buffer_data->name;
-        //out_description.size = buffer_data->size;
-        //out_description.type = buffer_data->type;
-        //out_description.usage = buffer_data->usage;
-        //out_description.native_handle = (void*)&buffer_data->gl_handle;
-    }
-}
-
-void Device::query_texture( TextureHandle texture, TextureDescription& out_description ) {
-    if ( texture.handle != k_invalid_handle ) {
-        //const TextureGL* texture_data = access_texture( texture );
-
-        //out_description.width = texture_data->width;
-        //out_description.height = texture_data->height;
-        //out_description.depth = texture_data->depth;
-        //out_description.format = texture_data->format;
-        //out_description.mipmaps = texture_data->mipmaps;
-        //out_description.type = texture_data->type;
-        //out_description.render_target = texture_data->render_target;
-        //out_description.native_handle = (void*)&texture_data->gl_handle;
-    }
-}
-
-void Device::query_pipeline( PipelineHandle pipeline, PipelineDescription& out_description ) {
-    if ( pipeline.handle != k_invalid_handle ) {
-        //const PipelineGL* pipeline_data = access_pipeline( pipeline );
-
-        //out_description.shader = pipeline_data->shader_state;
-    }
-}
-
-void Device::query_sampler( SamplerHandle sampler, SamplerDescription& out_description ) {
-    if ( sampler.handle != k_invalid_handle ) {
-        //const SamplerGL* sampler_data = access_sampler( sampler );
-    }
-}
-
-void Device::query_resource_list_layout( ResourceListLayoutHandle resource_list_layout, ResourceListLayoutDescription& out_description ) {
-    if ( resource_list_layout.handle != k_invalid_handle ) {
-        //const ResourceListLayoutGL* resource_list_layout_data = access_resource_list_layout( resource_list_layout );
-
-        //const uint32_t num_bindings = resource_list_layout_data->num_bindings;
-        //for ( size_t i = 0; i < num_bindings; i++ ) {
-        //    out_description.bindings[i].name = resource_list_layout_data->bindings[i].name;
-        //    out_description.bindings[i].type = resource_list_layout_data->bindings[i].type;
-        //}
-
-        //out_description.num_active_bindings = resource_list_layout_data->num_bindings;
-    }
-}
-
-void Device::query_resource_list( ResourceListHandle resource_list, ResourceListDescription& out_description ) {
-    if ( resource_list.handle != k_invalid_handle ) {
-        //const ResourceListGL* resource_list_data = access_resource_list( resource_list );
-    }
-}
-
-// Resource Map/Unmap ///////////////////////////////////////////////////////////
-
-void* Device::map_buffer( const MapBufferParameters& parameters ) {
-    //if ( parameters.buffer.handle == k_invalid_handle )
-        return nullptr;
-
-    
-}
-
-void Device::unmap_buffer( const MapBufferParameters& parameters ) {
-    if ( parameters.buffer.handle == k_invalid_handle )
-        return;
-
-    
-}
-
-// Other methods ////////////////////////////////////////////////////////////////
-void Device::resize_output_textures( RenderPassHandle render_pass, uint16_t width, uint16_t height ) {
-
-}
-
-void Device::queue_command_buffer( CommandBuffer* command_buffer ) {
-
-    queued_command_buffers[num_queued_command_buffers++] = command_buffer;
-}
-
-void Device::present() {
-}
-
-// Utility methods //////////////////////////////////////////////////////////////
-
-void check( VkResult result ) {
-    if ( result == VK_SUCCESS ) {
-        return;
-    }
-
-    HYDRA_LOG( "Vulkan error: code(%u)", result );
-    if ( result < 0 ) {
-        HYDRA_ASSERT( false, "Vulkan error: aborting." );
-    }
-}
-
-VkSurfaceFormatKHR choose_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface, const VkFormat* request_formats, int request_formats_count, VkColorSpaceKHR request_color_space )
-{
-    HYDRA_ASSERT( request_formats != NULL, "Format array cannot be null!" );
-    HYDRA_ASSERT( request_formats_count > 0, "Format count cannot be 0!" );
-
-    // Per Spec Format and View Format are expected to be the same unless VK_IMAGE_CREATE_MUTABLE_BIT was set at image creation
-    // Assuming that the default behavior is without setting this bit, there is no need for separate Swapchain image and image view format
-    // Additionally several new color spaces were introduced with Vulkan Spec v1.0.40,
-    // hence we must make sure that a format with the mostly available color space, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, is found and used.
-    uint32_t available_count;
-    vkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &available_count, NULL );
-    VkSurfaceFormatKHR* available_formats = (VkSurfaceFormatKHR*)malloc( sizeof( VkSurfaceFormatKHR ) * available_count );
-    vkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &available_count, available_formats );
-
-    // TODO: memory leak!
-
-    // First check if only one format, VK_FORMAT_UNDEFINED, is available, which would imply that any format is available
-    if ( available_count == 1 ) {
-        if ( available_formats[0].format == VK_FORMAT_UNDEFINED ) {
-            VkSurfaceFormatKHR ret;
-            ret.format = request_formats[0];
-            ret.colorSpace = request_color_space;
-            return ret;
-        }
-        else {
-            // No point in searching another format
-            return available_formats[0];
-        }
-    }
-    else {
-        // Request several formats, the first found will be used
-        for ( int request_i = 0; request_i < request_formats_count; request_i++ ) {
-            for ( uint32_t avail_i = 0; avail_i < available_count; avail_i++ ) {
-                if ( available_formats[avail_i].format == request_formats[request_i] && available_formats[avail_i].colorSpace == request_color_space )
-                    return available_formats[avail_i];
-            }
-        }
-
-        // If none of the requested image formats could be found, use the first available
-        return available_formats[0];
-    }
-}
-
-VkPresentModeKHR choose_present_mode( VkPhysicalDevice physical_device, VkSurfaceKHR surface, const VkPresentModeKHR* request_modes, int request_modes_count )
-{
-    HYDRA_ASSERT( request_modes != NULL, "Requested present mode array cannot be null!" );
-    HYDRA_ASSERT( request_modes_count > 0, "Requested mode count cannot be 0!" );
-
-    // Request a certain mode and confirm that it is available. If not use VK_PRESENT_MODE_FIFO_KHR which is mandatory
-    uint32_t available_count = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, surface, &available_count, NULL );
-    VkPresentModeKHR* available_modes = (VkPresentModeKHR*)malloc( sizeof( VkPresentModeKHR ) * available_count );
-    vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device, surface, &available_count, available_modes );
-    //for (uint32_t avail_i = 0; avail_i < available_count; avail_i++)
-    //    printf("[vulkan] avail_modes[%d] = %d\n", avail_i, avail_modes[avail_i]);
-
-    for ( int request_i = 0; request_i < request_modes_count; request_i++ ) {
-        for ( uint32_t avail_i = 0; avail_i < available_count; avail_i++ ) {
-            if ( request_modes[request_i] == available_modes[avail_i] )
-                return request_modes[request_i];
-        }
-    }
-
-    return VK_PRESENT_MODE_FIFO_KHR; // Always available
-}
-#else
-static_assert(false, "No platform was selected!");
-
-#endif // HYDRA_VULKAN
-
+#endif // HYDRA_OPENGL
 
 } // namespace graphics
 } // namespace hydra

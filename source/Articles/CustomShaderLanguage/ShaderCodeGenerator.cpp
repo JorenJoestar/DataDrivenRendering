@@ -1384,7 +1384,7 @@ void declaration_includes( Parser* parser ) {
             StringBuffer path_buffer;
             path_buffer.init( 256 );
 
-            path_buffer.append( "..\\data\\source\\" );
+            path_buffer.append( "..\\data\\" );
             path_buffer.append( token.text );
 
             char* text = hydra::read_file_into_memory( path_buffer.data, nullptr );
@@ -1440,9 +1440,6 @@ void declaration_includes( Parser* parser ) {
                 }
 
                 hfx::terminate_parser( &local_parser );
-            }
-            else {
-                HYDRA_LOG( "Cannot find include file %s\n", path_buffer.data);
             }
 
             //parser->shader.hfx_includes.emplace_back( token.text );
@@ -1605,9 +1602,6 @@ static void append_finalized_shader_code( const char* path, const Parser* parser
             const CodeFragment* included_code_fragment = find_code_fragment( parser, code_fragment->includes[i] );
             if ( included_code_fragment ) {
                 code_buffer.append( included_code_fragment->code );
-            }
-            else {
-                HYDRA_LOG( "Cannot find HFX shader include\n" );
             }
         }
         else {

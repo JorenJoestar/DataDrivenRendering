@@ -181,7 +181,9 @@ void ShaderInstance::load_resources( const PipelineCreation& pipeline_creation, 
                             SamplerHandle sampler_handle = database.find_sampler( sampler_name );
                             // Set sampler, opengl only!
                             // TODO:
+#if defined (HYDRA_OPENGL)
                             device.link_texture_sampler( handle, sampler_handle );
+#endif // HYDRA_OPENGL
                         }
 
                         resources_handles[r].handle = handle.handle;
@@ -659,11 +661,17 @@ void LineRenderer::terminate( Device& device ) {
 }
 
 void LineRenderer::line( const vec3s& from, const vec3s& to, uint32_t color0, uint32_t color1 ) {
+    if ( current_line_index >= k_max_lines )
+        return;
+
     s_line_buffer[current_line_index++].set( from.x, from.y, from.z, color0 );
     s_line_buffer[current_line_index++].set( to.x, to.y, to.z, color1 );
 }
 
 void LineRenderer::line_2d( const vec2s& from, const vec2s& to, uint32_t color0, uint32_t color1 ) {
+    if ( current_line_index_2d >= k_max_lines )
+        return;
+
     s_line_buffer_2d[current_line_index_2d++] = { from.x, from.y, color0 };
     s_line_buffer_2d[current_line_index_2d++] = { to.x, to.y, color1 };
 }

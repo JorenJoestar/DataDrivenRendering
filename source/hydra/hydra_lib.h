@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 //
-// Hydra Lib - v0.03
+// Hydra Lib - v0.05
 //
 // Simple general functions for log, file, process, time.
 //
@@ -13,6 +13,8 @@
 //
 // Revision history //////////////////////
 //
+//      0.05 (2020/03/02) + Implemented Time Subsystem. + Improved Execute Process error message.
+//      0.04 (2020/02/27) + Removal of STB-dependent parts
 //      0.03 (2019/12/17) + Interface cleanup. + Added array init macro.
 //      0.02 (2019/09/26) added stb.
 //      0.01 (2019/06/20) initial implementation.
@@ -38,8 +40,8 @@
 
 #define HY_FILE
 #define HY_LOG
-//#define HY_PROCESS
-//#define HY_TIME
+#define HY_PROCESS
+#define HY_TIME
 #define HY_STB
 #define HY_STB_LEAKCHECK
 
@@ -130,7 +132,7 @@ namespace hydra {
     #define ArrayLength(array) ( sizeof(array)/sizeof((array)[0]) )
 
     // Data structures //////////////////////////////////////////////////////////
-
+#if defined (HY_STB)
     //
     // Array of interned strings. Uses a hash map for each string, but interns string into a big shared buffer.
     // Based on the amazing article by OurMachinery: https://ourmachinery.com/post/data-structures-part-3-arrays-of-arrays/
@@ -158,7 +160,7 @@ namespace hydra {
     uint32_t                        get_string_count( StringArray& string_array );
     const char*                     get_string( StringArray& string_array, uint32_t index );
     const char*                     intern( StringArray& string_array, const char* string );
-
+#endif // HY_STB
 
     //
     // Simple string that references another one. Used to not allocate strings if not needed.
@@ -220,8 +222,10 @@ namespace hydra {
 #endif
 
     using FileHandle = FILE*;
-
+#if defined (HY_STB)
     void                            read_file( cstring filename, cstring mode, Buffer& memory );
+#endif // HY_STB
+
     char*                           read_file_into_memory( const char* filename, size_t* size );
 
     void                            open_file( cstring filename, cstring mode, FileHandle* file );
@@ -231,10 +235,13 @@ namespace hydra {
     FileTime                        get_last_write_time( cstring filename );
     uint32_t                        get_full_path_name( cstring path, char* out_full_path, uint32_t max_size );
 
+#if defined (HY_STB)
     void                            find_files_in_path( cstring file_pattern, StringArray& files );         // Search files matching file_pattern and puts them in files array.
                                                                                                             // Examples: "..\\data\\*", "*.bin", "*.*
     void                            find_files_in_path( cstring extension, cstring search_pattern, 
                                                         StringArray& files, StringArray& directories );     // Search files and directories using search_patterns, and 
+#endif // HY_STB
+
 
     struct ScopedFile {
         ScopedFile( cstring filename, cstring mode );
@@ -257,8 +264,19 @@ namespace hydra {
     // Time /////////////////////////////////////////////////////////////////////
 #if defined(HY_TIME)
 
-    void                            time_service_init();
+    void                            time_service_init();                // Needs to be called once at startup.
+    void                            time_service_terminate();           // Needs to be called at shutdown.
 
+    int64_t                         time_now();                         // Get current time ticks.
+    
+    double                          time_microseconds( int64_t time );  // Get microseconds from time ticks
+    double                          time_milliseconds( int64_t time );  // Get milliseconds from time ticks
+    double                          time_seconds( int64_t time );       // Get seconds from time ticks
+
+    int64_t                         time_from( int64_t starting_time ); // Get time difference from start to current time.
+    double                          time_from_microseconds( int64_t starting_time ); // Convenience method.
+    double                          time_from_milliseconds( int64_t starting_time ); // Convenience method.
+    double                          time_from_seconds( int64_t starting_time );      // Convenience method.
 
 #endif // HY_TIME
 

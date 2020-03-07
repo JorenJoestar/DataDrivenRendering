@@ -1,16 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug_Vulkan|x64">
-      <Configuration>Debug_Vulkan</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release_Vulkan|x64">
-      <Configuration>Release_Vulkan</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
@@ -20,10 +12,10 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{81F7E26D-5845-4A29-B087-EADF26C49A80}</ProjectGuid>
+    <ProjectGuid>{BB158F73-7096-4DF3-97C7-2703151633C3}</ProjectGuid>
     <RootNamespace>DataDrivenRendering</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>DataDrivenRendering</ProjectName>
+    <ProjectName>CustomShaderLanguage</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -32,20 +24,7 @@
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Vulkan|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_Vulkan|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
@@ -60,32 +39,16 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Vulkan|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release_Vulkan|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)..\Bin\</OutDir>
-    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Vulkan|x64'">
-    <OutDir>$(SolutionDir)..\Bin\</OutDir>
-    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>Build\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)_$(Configuration)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)..\Bin\</OutDir>
-    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_Vulkan|x64'">
     <OutDir>$(SolutionDir)..\Bin\</OutDir>
     <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)_$(Configuration)</TargetName>
@@ -103,22 +66,6 @@
     <Link>
       <AdditionalLibraryDirectories>$(LIB_PATH)\SDL2-2.0.9\lib\x64;$(LIB_PATH)\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glew32.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <SubSystem>Console</SubSystem>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Vulkan|x64'">
-    <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\source;..\source\imgui;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;$(VULKAN_SDK)\include</AdditionalIncludeDirectories>
-      <ExceptionHandling>false</ExceptionHandling>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;HYDRA_VULKAN;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <Link>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\lib;$(LIB_PATH)\SDL2-2.0.9\lib\x64;$(LIB_PATH)\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;VkLayer_utils.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -141,64 +88,33 @@
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_Vulkan|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\source;..\source\imgui;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;HYDRA_VULKAN;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <Link>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(LIB_PATH)\SDL2-2.0.9\lib\x64;$(LIB_PATH)\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;glew32.lib;SDL2.lib;SDL2main.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <SubSystem>Console</SubSystem>
-    </Link>
-  </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\source\hydra\hydra_application.cpp" />
+    <ClCompile Include="..\source\Articles\CustomShaderLanguage\CustomShaderLanguage.cpp" />
+    <ClCompile Include="..\source\Articles\CustomShaderLanguage\ShaderCodeGenerator.cpp" />
     <ClCompile Include="..\source\hydra\hydra_graphics.cpp" />
-    <ClCompile Include="..\source\hydra\hydra_rendering.cpp" />
     <ClCompile Include="..\source\hydra\hydra_imgui.cpp" />
     <ClCompile Include="..\source\hydra\hydra_lib.cpp" />
-    <ClCompile Include="..\source\hydra\hydra_resources.cpp" />
     <ClCompile Include="..\source\imgui\imgui.cpp" />
     <ClCompile Include="..\source\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\source\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\source\imgui\imgui_impl_sdl.cpp" />
     <ClCompile Include="..\source\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\source\imgui\TextEditor.cpp" />
-    <ClCompile Include="..\source\main.cpp" />
     <ClCompile Include="..\source\Lexer.cpp" />
-    <ClCompile Include="..\source\MaterialSystem.cpp" />
     <ClCompile Include="..\source\NodeEditor\Source\crude_json.cpp" />
     <ClCompile Include="..\source\NodeEditor\Source\imgui_canvas.cpp" />
     <ClCompile Include="..\source\NodeEditor\Source\imgui_node_editor.cpp" />
     <ClCompile Include="..\source\NodeEditor\Source\imgui_node_editor_api.cpp" />
-    <ClCompile Include="..\source\RenderPipelineApplication.cpp" />
-    <ClCompile Include="..\source\ShaderCodeGenerator.cpp" />
-    <ClCompile Include="..\source\CustomShaderLanguage.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\source\CodeGenerator.h" />
-    <ClInclude Include="..\source\Deprecated.h" />
-    <ClInclude Include="..\source\hydra\hydra_application.h" />
+    <ClInclude Include="..\source\Articles\CustomShaderLanguage\CodeGenerator.h" />
+    <ClInclude Include="..\source\Articles\CustomShaderLanguage\CustomShaderLanguage.h" />
+    <ClInclude Include="..\source\Articles\CustomShaderLanguage\ShaderCodeGenerator.h" />
     <ClInclude Include="..\source\hydra\hydra_graphics.h" />
-    <ClInclude Include="..\source\hydra\hydra_rendering.h" />
     <ClInclude Include="..\source\hydra\hydra_imgui.h" />
     <ClInclude Include="..\source\hydra\hydra_lib.h" />
-    <ClInclude Include="..\source\hydra\hydra_resources.h" />
     <ClInclude Include="..\source\Lexer.h" />
-    <ClInclude Include="..\source\MaterialSystem.h" />
-    <ClInclude Include="..\source\RenderPipelineApplication.h" />
-    <ClInclude Include="..\source\ShaderCodeGenerator.h" />
     <ClInclude Include="..\source\stb_ds.h" />
-    <ClInclude Include="..\source\CustomShaderLanguage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

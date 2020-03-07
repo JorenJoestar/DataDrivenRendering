@@ -2,12 +2,15 @@
 
 
 #include <SDL.h>
-#if defined (HYDRA_VULKAN)
-#include <SDL_vulkan.h>
-#endif // HYDRA_OPENGL
 
-static void generate_hdf_classes( Lexer& lexer, hdf::Parser& parser, hdf::CodeGenerator& code_generator, DataBuffer* data_buffer );
-static void generate_shader_permutation( const char* filename, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer );
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+static void generate_hdf_classes( const char* hdf_file, const char* output_file, Lexer& lexer, hdf::Parser& parser, hdf::CodeGenerator& code_generator, DataBuffer* data_buffer );
+
+static void generate_shader_permutations( const char* filename, const char* output_folder, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer );
+
 static void compile_hfx( const char* filename, const char* out_filename, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer );
 
 static void ReflectUI( const hdf::Parser& parser ) {
@@ -104,10 +107,18 @@ void CustomShaderLanguageApplication::init() {
     ImGui_ImplSDL2_InitForOpenGL( window, gl_context );
 #endif // HYDRA_OPENGL
 
+    commands = nullptr;
+
     // Init the gfx_device device
     hydra::graphics::DeviceCreation device_creation = {};
     device_creation.window = window;
     gfx_device.init( device_creation );
+
+    int width, height;
+    SDL_GetWindowSize( window, &width, &height );
+    // Initial resize.
+    gfx_device.resize( (uint16_t)width, (uint16_t)height );
+
 
     // Data Buffer used by the lexer
     DataBuffer data_buffer;
@@ -117,13 +128,13 @@ void CustomShaderLanguageApplication::init() {
     // 1. HDF (Hydra Data Format) parsing and code generation
     // From a HDF file generate a header file.
     // Article: https://jorenjoestar.github.io/post/writing_a_simple_code_generator/
-    generate_hdf_classes( lexer, parser, code_generator, &data_buffer );
+    generate_hdf_classes( "..\\data\\articles\\CustomShaderLanguage\\SimpleData.hdf", "..\\source\\Articles\\CustomShaderLanguage\\SimpleData.h", lexer, parser, code_generator, &data_buffer );
 
     ////////
     // 2. HFX (Hydra Effects)
     // From a HFX file generate single GLSL files to be used by the gfx_device library.
     // Article: https://jorenjoestar.github.io/post/writing_shader_effect_language_1/
-    generate_shader_permutation( "..\\data\\SimpleFullscreen.hfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
+    generate_shader_permutations( "..\\data\\articles\\CustomShaderLanguage\\SimpleFullscreen.hfx", "..\\data\\articles\\CustomShaderLanguage\\", lexer, effect_parser, hfx_code_generator, &data_buffer );
 
     ////////
     // 3. HFX full usage
@@ -133,17 +144,17 @@ void CustomShaderLanguageApplication::init() {
     //manual_init_graphics();
 
     // 3.2 Compile HFX file to binary and use it to init gfx_device.
-    hfx::compile_shader_effect_file( &hfx_code_generator, "..\\data\\", "SimpleFullscreen.bhfx" );
+    hfx::compile_shader_effect_file( &hfx_code_generator, "..\\data\\articles\\CustomShaderLanguage\\", "SimpleFullscreen.bhfx" );
 
     // 3.3 Generate shader resources code and use it to draw.
-    load_shader_effect();
+    load_shader_effect( "..\\data\\articles\\CustomShaderLanguage\\SimpleFullscreen.bhfx" );
 
     // 3.4 Generate constant buffer header file and use it.
-    hfx::generate_shader_resource_header( &hfx_code_generator, "..\\source\\" );
+    hfx::generate_shader_resource_header( &hfx_code_generator, "..\\source\\Articles\\CustomShaderLanguage\\" );
 
     // 4. HFX ImGui Shader
-    generate_shader_permutation( "..\\data\\ImGui.hfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
-    compile_hfx( "..\\data\\ImGui.hfx", "ImGui.bhfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
+    //generate_shader_permutation( "..\\data\\ImGui.hfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
+    //compile_hfx( "..\\data\\ImGui.hfx", "ImGui.bhfx", lexer, effect_parser, hfx_code_generator, &data_buffer );
 
 
     hydra_Imgui_Init( gfx_device );
@@ -179,7 +190,7 @@ void CustomShaderLanguageApplication::manual_init_graphics() {
     read_file( "..\\data\\SimpleFullscreen_ComputeTest.comp", "r", compute_file_buffer );
     if ( array_length( compute_file_buffer ) ) {
 
-        compute_pipeline.shaders.stages[0] = { graphics::ShaderStage::Compute, (const char*)compute_file_buffer };
+        compute_pipeline.shaders.stages[0] = { (const char*)compute_file_buffer, (uint32_t)strlen( (const char*)compute_file_buffer), graphics::ShaderStage::Compute };
         compute_pipeline.shaders.stages_count = 1;
         compute_pipeline.shaders.name = "First Compute";
     }
@@ -190,8 +201,8 @@ void CustomShaderLanguageApplication::manual_init_graphics() {
     read_file( "..\\data\\SimpleFullscreen_ToScreen.frag", "r", color_frag_buffer );
 
     if ( array_length( color_vert_buffer ) && array_length( color_frag_buffer ) ) {
-        graphics_pipeline.shaders.stages[0] = { graphics::ShaderStage::Vertex, (const char*)color_vert_buffer };
-        graphics_pipeline.shaders.stages[1] = { graphics::ShaderStage::Fragment, (const char*)color_frag_buffer };
+        graphics_pipeline.shaders.stages[0] = { (const char*)color_vert_buffer, (uint32_t)strlen( (const char*)color_vert_buffer), graphics::ShaderStage::Vertex };
+        graphics_pipeline.shaders.stages[1] = { (const char*)color_frag_buffer, (uint32_t)strlen( (const char*)color_frag_buffer ), graphics::ShaderStage::Fragment };
         graphics_pipeline.shaders.stages_count = 2;
         graphics_pipeline.shaders.name = "First Fullscreen";
     }
@@ -255,9 +266,9 @@ void CustomShaderLanguageApplication::manual_init_graphics() {
 
     // Command buffer
     if ( commands ) {
-        gfx_device.destroy_command_buffer( commands );
+        gfx_device.free_command_buffer( commands );
     }
-    commands = gfx_device.create_command_buffer( graphics::QueueType::Graphics, 1024, true );
+    commands = gfx_device.get_command_buffer( graphics::QueueType::Graphics, 1024, true );
 
     commands->begin_submit( 0 );
     commands->bind_pipeline( first_compute_pipeline );
@@ -297,13 +308,13 @@ static void compile_shader_effect_pass( hydra::graphics::Device& device, hfx::Sh
     out_resource_set_layout = device.create_resource_list_layout( resource_layout_creation );
 }
 
-void CustomShaderLanguageApplication::load_shader_effect() {
+void CustomShaderLanguageApplication::load_shader_effect( const char* filename ) {
 
     using namespace hydra;
 
     // Create shader
     hfx::ShaderEffectFile shader_effect_file;
-    hfx::init_shader_effect_file( shader_effect_file, "..\\data\\SimpleFullscreen.bhfx" );
+    hfx::init_shader_effect_file( shader_effect_file, filename );
 
     graphics::ResourceListLayoutHandle compute_resource_layout, gfx_resource_layout;
 
@@ -328,13 +339,40 @@ void CustomShaderLanguageApplication::load_shader_effect() {
 
     // Resource sets
     // - Compute
-    const graphics::ResourceListCreation::Resource compute_resources_handles[] = { local_constant_buffer.buffer.handle, render_target.handle };
-    graphics::ResourceListCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, 2 };
+    graphics::ResourceListLayoutDescription compute_layout_desc;
+    gfx_device.query_resource_list_layout( compute_resource_layout, compute_layout_desc );
+
+    graphics::ResourceListCreation::Resource compute_resources_handles[8];
+
+    for ( size_t i = 0; i < compute_layout_desc.num_active_bindings; ++i ) {
+        const graphics::ResourceBinding& binding = compute_layout_desc.bindings[i];
+        hydra::print_format( "Compute binding %s, %u\n", binding.name, i );
+
+        if ( strcmp( binding.name, "LocalConstants" ) == 0 ) {
+            compute_resources_handles[i].handle = local_constant_buffer.buffer.handle;
+        }
+        else if ( strcmp( binding.name, "destination_texture" ) == 0 ) {
+            compute_resources_handles[i].handle = render_target.handle;
+        }
+        else {
+            compute_resources_handles[i].handle = 0;
+        }
+
+    }
+    graphics::ResourceListCreation compute_resources_creation = { compute_resource_layout, compute_resources_handles, compute_layout_desc.num_active_bindings };
     graphics::ResourceListHandle compute_resources = gfx_device.create_resource_list( compute_resources_creation );
 
     // - Graphics
+    graphics::ResourceListLayoutDescription gfx_layout_desc;
+    gfx_device.query_resource_list_layout( gfx_resource_layout, gfx_layout_desc );
+
+    for ( size_t i = 0; i < gfx_layout_desc.num_active_bindings; ++i ) {
+        const graphics::ResourceBinding& binding = compute_layout_desc.bindings[i];
+        hydra::print_format( "Gfx binding %s, %u\n", binding.name, i );
+    }
+
     const graphics::ResourceListCreation::Resource gfx_resources_handles[] = { render_target.handle };
-    graphics::ResourceListCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, 2 };
+    graphics::ResourceListCreation gfx_resources_creation = { gfx_resource_layout, gfx_resources_handles, gfx_layout_desc.num_active_bindings };
 
     graphics::ResourceListHandle gfx_resources = gfx_device.create_resource_list( gfx_resources_creation );
 
@@ -353,9 +391,9 @@ void CustomShaderLanguageApplication::load_shader_effect() {
 
     // Command buffer
     if ( commands ) {
-        gfx_device.destroy_command_buffer( commands );
+        gfx_device.free_command_buffer( commands );
     }
-    commands = gfx_device.create_command_buffer( graphics::QueueType::Graphics, 1024, true );
+    commands = gfx_device.get_command_buffer( graphics::QueueType::Graphics, 1024, true );
 
     commands->begin_submit( 0 );
     commands->bind_pipeline( first_compute_pipeline );
@@ -364,6 +402,8 @@ void CustomShaderLanguageApplication::load_shader_effect() {
     commands->end_submit();
 
     commands->begin_submit( 1 );
+    commands->clear( 0, 0, 0, 1 );
+    commands->set_scissor( {0, 0, gfx_device.swapchain_width * 1.0f, gfx_device.swapchain_height * 1.0f} );
     commands->bind_pipeline( first_graphics_pipeline );
     commands->bind_resource_list( &gfx_resources, 1, nullptr, 0 );
     commands->bind_vertex_buffer( gfx_device.get_fullscreen_vertex_buffer(), 0, 0 );
@@ -371,9 +411,9 @@ void CustomShaderLanguageApplication::load_shader_effect() {
     commands->end_submit();
 }
 
-static void generate_hdf_classes( Lexer& lexer, hdf::Parser& parser, hdf::CodeGenerator& code_generator, DataBuffer* data_buffer ) {
-
-    char* text = hydra::read_file_into_memory( "..\\data\\SimpleData.hdf", nullptr );
+static void generate_hdf_classes( const char* hdf_file, const char* output_file, Lexer& lexer, hdf::Parser& parser, hdf::CodeGenerator& code_generator, DataBuffer* data_buffer ) {
+    
+    char* text = hydra::read_file_into_memory( hdf_file, nullptr );
     init_lexer( &lexer, (char*)text, data_buffer );
 
     hdf::init_parser( &parser, &lexer, 1024 );
@@ -381,10 +421,10 @@ static void generate_hdf_classes( Lexer& lexer, hdf::Parser& parser, hdf::CodeGe
 
     hdf::init_code_generator( &code_generator, &parser, 6000 );
     code_generator.generate_imgui = true;
-    hdf::generate_code( &code_generator, "..\\source\\SimpleData.h" );
+    hdf::generate_code( &code_generator, output_file );
 }
 
-static void generate_shader_permutation( const char* filename, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer ) {
+static void generate_shader_permutations( const char* filename, const char* output_folder, Lexer& lexer, hfx::Parser& effect_parser, hfx::CodeGenerator& hfx_code_generator, DataBuffer* data_buffer ) {
 
     char* text = hydra::read_file_into_memory( filename, nullptr );
     init_lexer( &lexer, (char*)text, data_buffer );
@@ -393,7 +433,7 @@ static void generate_shader_permutation( const char* filename, Lexer& lexer, hfx
     hfx::generate_ast( &effect_parser );
 
     hfx::init_code_generator( &hfx_code_generator, &effect_parser, 8000, 8, filename );
-    hfx::generate_shader_permutations( &hfx_code_generator, "..\\data\\" );
+    hfx::generate_shader_permutations( &hfx_code_generator, output_folder );
 }
 
 //
@@ -418,10 +458,6 @@ void CustomShaderLanguageApplication::main_loop() {
 
     ImGuiIO& io = ImGui::GetIO();
 
-    // Initial resize.
-    gfx_device.resize( (uint16_t)io.DisplaySize.x, (uint16_t)io.DisplaySize.y );
-
-
     // Declare generated class from HDF
     RenderTarget rt = {};
     RenderPass rp = {};
@@ -429,8 +465,6 @@ void CustomShaderLanguageApplication::main_loop() {
 
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4( 0.45f, 0.05f, 0.00f, 1.00f );
-
-    hydra::graphics::CommandBuffer* ui_commands = gfx_device.create_command_buffer( hydra::graphics::QueueType::Graphics, 1024, false );
 
     // Main loop
     bool done = false;
@@ -465,13 +499,10 @@ void CustomShaderLanguageApplication::main_loop() {
         // Rendering
         ImGui::Render();
 
+        hydra::graphics::CommandBuffer* ui_commands = gfx_device.get_command_buffer( hydra::graphics::QueueType::Graphics, 1024, false );
         ui_commands->reset();
 
 #if defined HYDRA_OPENGL
-        glViewport( 0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y );
-        glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
-        glClear( GL_COLOR_BUFFER_BIT );
-
         SDL_GL_MakeCurrent( window, gl_context );
 #endif
         hydra_imgui_collect_draw_data( ImGui::GetDrawData(), gfx_device, *ui_commands );
@@ -486,9 +517,15 @@ void CustomShaderLanguageApplication::main_loop() {
 #endif
     }
 
-    gfx_device.destroy_command_buffer( ui_commands );
-
     // Cleanup
     terminate();
 }
 
+
+int main(int argc, char** argv) {
+
+    CustomShaderLanguageApplication application;
+    application.main_loop();
+
+    return 0;
+}

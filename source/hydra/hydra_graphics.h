@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 //
-//  Hydra Graphics - v0.044
+//  Hydra Graphics - v0.047
 //  3D API wrapper around Vulkan/Direct3D12/OpenGL.
 //  Mostly based on the amazing Sokol library (https://github.com/floooh/sokol), but with a different target (wrapping Vulkan/Direct3D12).
 //
@@ -15,6 +15,9 @@
 //
 // Revision history //////////////////////
 //
+//      0.047 (2020/03/04): + Added swapchain present. + Reworked command buffer interface.
+//      0.046 (2020/03/03): + 90% graphics pipeline creation. + Added RenderPass handle to Pipeline creation.
+//      0.045 (2020/02/25): + Initial Vulkan creation with SDL support. Still missing resources.
 //      0.044 (2020/01/14): + Fixed depth/stencil FBO generation.
 //      0.043 (2019/12/17): + Removed 'compute' creation flag.
 //      0.042 (2019/10/09): + Added initial support for render passes creation. + Added begin/end render pass commands interface.
@@ -58,8 +61,6 @@
 // Api selection
 
 // Define these either here or in project.
-//#define HYDRA_VULKAN
-//#define HYDRA_D3D12
 //#define HYDRA_OPENGL
 
 //////////////////////////////////
@@ -74,18 +75,12 @@
 #pragma warning (disable: 4100)
 #endif // _MSC_VER
 
-
-
 // API includes
 #if defined (HYDRA_OPENGL)
 // 
 #include <GL/glew.h>
 
-#elif defined (HYDRA_VULKAN)
-
-#include <vulkan/vulkan.h>
-
-#endif // HYDRA_VULKAN
+#endif // HYDRA_OPENGL
 
 namespace hydra {
 namespace graphics {
@@ -689,6 +684,8 @@ struct RasterizationCreation {
 struct DeviceCreation {
 
     void*                           window              = nullptr; // Pointer to API-specific window: SDL_Window, GLFWWindow
+    uint16_t                        width               = 1;
+    uint16_t                        height              = 1;
     bool                            debug               = false;
 
 }; // struct DeviceCreation
@@ -745,8 +742,9 @@ struct ShaderCreation {
 
     struct Stage {
 
-        ShaderStage::Enum           type                = ShaderStage::Compute;
         const char*                 code                = nullptr;
+        uint32_t                    code_size           = 0;
+        ShaderStage::Enum           type                = ShaderStage::Compute;
 
     }; // struct Stage
 
@@ -861,6 +859,7 @@ struct PipelineCreation {
     VertexInputCreation             vertex_input;
     ShaderCreation                  shaders;
 
+    RenderPassHandle                render_pass;
     ResourceListLayoutHandle        resource_list_layout[k_max_resource_layouts];
     const ViewportState*            viewport            = nullptr;
 
@@ -1007,11 +1006,18 @@ struct PipelineGL;
 struct SamplerGL;
 struct ResourceListLayoutGL;
 struct ResourceListGL;
-struct DeviceStateGL;
 struct RenderPassGL;
 
-#elif defined (HYDRA_VULKAN)
+struct DeviceStateGL;
 
+#define ShaderStateAPIGnostic ShaderStateGL
+#define TextureAPIGnostic TextureGL
+#define BufferAPIGnostic BufferGL
+#define PipelineAPIGnostic PipelineGL
+#define SamplerAPIGnostic SamplerGL
+#define ResourceListLayoutAPIGnostic ResourceListLayoutGL
+#define ResourceListAPIGnostic ResourceListGL
+#define RenderPassAPIGnostic RenderPassGL
 
 #endif // HYDRA_OPENGL
 
@@ -1079,8 +1085,8 @@ struct Device {
     void                            unmap_buffer( const MapBufferParameters& parameters );
 
     // Command Buffers //////////////////////////////////////////////////////////
-    CommandBuffer*                  create_command_buffer( QueueType::Enum type, uint32_t size, bool baked );    // Request a command buffer with a certain size. If baked reset will affect only the read offset.
-    void                            destroy_command_buffer( CommandBuffer* command_buffer );
+    CommandBuffer*                  get_command_buffer( QueueType::Enum type, uint32_t size, bool baked );    // Request a command buffer with a certain size. If baked reset will affect only the read offset.
+    void                            free_command_buffer( CommandBuffer* command_buffer );
 
     void                            queue_command_buffer( CommandBuffer* command_buffer );          // Queue command buffer that will not be executed until present is called.
 
@@ -1102,13 +1108,14 @@ struct Device {
     void                            backend_terminate();
 
     ResourcePool                    buffers;
-    ResourcePool                    shaders;
     ResourcePool                    textures;
     ResourcePool                    pipelines;
     ResourcePool                    samplers;
     ResourcePool                    resource_list_layouts;
     ResourcePool                    resource_lists;
 	ResourcePool                    render_passes;
+    ResourcePool                    command_buffers;
+    ResourcePool                    shaders;
 
     // Primitive resources
     BufferHandle                    fullscreen_vertex_buffer;
@@ -1118,63 +1125,53 @@ struct Device {
     BufferHandle                    dummy_constant_buffer;
 
     CommandBuffer**                 queued_command_buffers              = nullptr;
+    uint32_t                        num_allocated_command_buffers       = 0;
     uint32_t                        num_queued_command_buffers          = 0;
 
     uint16_t                        swapchain_width                     = 1;
     uint16_t                        swapchain_height                    = 1;
-    
+
+
+    ShaderStateAPIGnostic*          access_shader( ShaderHandle shader );
+    const ShaderStateAPIGnostic*    access_shader( ShaderHandle shader ) const;
+
+    TextureAPIGnostic*              access_texture( TextureHandle texture );
+    const TextureAPIGnostic*        access_texture( TextureHandle texture ) const;
+
+    BufferAPIGnostic*               access_buffer( BufferHandle buffer );
+    const BufferAPIGnostic*         access_buffer( BufferHandle buffer ) const;
+
+    PipelineAPIGnostic*             access_pipeline( PipelineHandle pipeline );
+    const PipelineAPIGnostic*       access_pipeline( PipelineHandle pipeline ) const;
+
+    SamplerAPIGnostic*              access_sampler( SamplerHandle sampler );
+    const SamplerAPIGnostic*        access_sampler( SamplerHandle sampler ) const;
+
+    ResourceListLayoutAPIGnostic*   access_resource_list_layout( ResourceListLayoutHandle resource_layout );
+    const ResourceListLayoutAPIGnostic* access_resource_list_layout( ResourceListLayoutHandle resource_layout ) const;
+
+    ResourceListAPIGnostic*         access_resource_list( ResourceListHandle resource_list );
+    const ResourceListAPIGnostic*   access_resource_list( ResourceListHandle resource_list ) const;
+
+    RenderPassAPIGnostic*           access_render_pass( RenderPassHandle render_pass );
+    const RenderPassAPIGnostic*     access_render_pass( RenderPassHandle render_pass ) const;
+
+
 #if defined (HYDRA_OPENGL)
+
+    // API Specific resource methods. Ideally they should not exist, but needed.
 
     // Shaders are considered resources in the OpenGL device!
     ShaderHandle                    create_shader( const ShaderCreation& creation );
     void                            destroy_shader( ShaderHandle shader );
     void                            query_shader( ShaderHandle shader, ShaderStateDescription& out_description );
 
-    ShaderStateGL*                  access_shader( ShaderHandle shader );
-    const ShaderStateGL*            access_shader( ShaderHandle shader ) const;
-
-    TextureGL*                      access_texture( TextureHandle texture );
-    const TextureGL*                access_texture( TextureHandle texture ) const;
-
-    BufferGL*                       access_buffer( BufferHandle buffer );
-    const BufferGL*                 access_buffer( BufferHandle buffer ) const;
-
-    PipelineGL*                     access_pipeline( PipelineHandle pipeline );
-    const PipelineGL*               access_pipeline( PipelineHandle pipeline ) const;
-
-    SamplerGL*                      access_sampler( SamplerHandle sampler );
-    const SamplerGL*                access_sampler( SamplerHandle sampler ) const;
-
-    ResourceListLayoutGL*           access_resource_list_layout( ResourceListLayoutHandle resource_layout );
-    const ResourceListLayoutGL*     access_resource_list_layout( ResourceListLayoutHandle resource_layout ) const;
-
-    ResourceListGL*                 access_resource_list( ResourceListHandle resource_list );
-    const ResourceListGL*           access_resource_list( ResourceListHandle resource_list ) const;
-
-    RenderPassGL*                   access_render_pass( RenderPassHandle render_pass );
-    const RenderPassGL*             access_render_pass( RenderPassHandle render_pass ) const;
 
     // Specialized methods
     void                            link_texture_sampler( TextureHandle texture, SamplerHandle sampler );
 
     DeviceStateGL*                  device_state            = nullptr;
-#elif defined (HYDRA_VULKAN)
-    
-
-    VkAllocationCallbacks*          vulkan_allocation_callbacks;
-    VkInstance                      vulkan_instance;
-    VkPhysicalDevice                vulkan_physical_device;
-    VkDevice                        vulkan_device;
-    VkQueue                         vulkan_queue;
-    uint32_t                        vulkan_queue_family;
-    VkDescriptorPool                vulkan_descriptor_pool;
-    VkSurfaceKHR                    vulkan_window_surface;
-    VkSurfaceFormatKHR              vulkan_surface_format;
-    VkPresentModeKHR                vulkan_present_mode;
-
-    VkDebugReportCallbackEXT        vulkan_debug_callback;
-#elif defined (HYDRA_OPENGL)
-#endif // HYDRA_VULKAN
+#endif // HYDRA_OPENGL
 
 }; // struct Device
 
@@ -1412,6 +1409,10 @@ struct CommandBuffer {
     bool                            has_commands()      { return write_offset > 0; }
     bool                            end_of_stream()     { return read_offset >= write_offset; }
     void                            reset();
+
+    ResourceHandle                  handle;
+    uint32_t                        swapchain_frame_issued;
+    uint32_t                        frames_in_flight;
 
     SubmitCommand                   current_submit_command;             // Cached submit command
     commands::SubmitHeader*         current_submit_header = nullptr;

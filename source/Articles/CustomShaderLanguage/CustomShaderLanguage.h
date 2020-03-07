@@ -32,7 +32,7 @@ struct CustomShaderLanguageApplication {
     void                            main_loop();
 
     void                            manual_init_graphics();
-    void                            load_shader_effect();
+    void                            load_shader_effect( const char* filename );
 
     struct SDL_Window*              window = nullptr;
 

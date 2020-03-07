@@ -40,7 +40,9 @@ bool hydra_Imgui_Init( hydra::graphics::Device& graphics_device ) {
     io.Fonts->TexID = (ImTextureID)&g_font_texture;
 
     // Compile shader
+#if defined(HYDRA_OPENGL)
     hfx::compile_hfx( "..\\data\\source\\ImGui.hfx", "..\\data\\bin\\", "ImGui.bhfx" );
+#endif // HYDRA_OPENGL
 
     // Create shader
     hfx::ShaderEffectFile shader_effect_file;
@@ -52,6 +54,7 @@ bool hydra_Imgui_Init( hydra::graphics::Device& graphics_device ) {
     PipelineCreation pipeline_creation = {};
 
     hfx::get_pipeline( pass_header, pipeline_creation);
+    pipeline_creation.render_pass = graphics_device.get_swapchain_pass();
 
     uint8_t num_bindings = 0;
     const hydra::graphics::ResourceListLayoutCreation::Binding* bindings = hfx::get_pass_layout_bindings( pass_header, 0, num_bindings );

@@ -1,6 +1,6 @@
 
 //
-// Hydra HFX v0.11
+// Hydra HFX v0.12
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
@@ -9,6 +9,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.12  (2020/03/05): + Custom version local to articles "Custom Shader Language" and "Hydra HFX"
 //      0.11  (2020/02/06): + Added revision history.
 //
 // Defines ///////////////////////////////

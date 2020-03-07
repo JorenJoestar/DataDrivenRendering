@@ -3,24 +3,30 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2003
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DataDrivenRendering", "DataDrivenRendering.vcxproj", "{81F7E26D-5845-4A29-B087-EADF26C49A80}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderPipelines", "RenderPipelines.vcxproj", "{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CustomShaderLanguage", "CustomShaderLanguage.vcxproj", "{BB158F73-7096-4DF3-97C7-2703151633C3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Materials", "Materials.vcxproj", "{2C5A5DA6-EF06-4920-A26F-632AA20C98AD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug_Vulkan|x64 = Debug_Vulkan|x64
 		Debug|x64 = Debug|x64
-		Release_Vulkan|x64 = Release_Vulkan|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug_Vulkan|x64.ActiveCfg = Debug_Vulkan|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug_Vulkan|x64.Build.0 = Debug_Vulkan|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug|x64.ActiveCfg = Debug|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Debug|x64.Build.0 = Debug|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release_Vulkan|x64.ActiveCfg = Release_Vulkan|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release_Vulkan|x64.Build.0 = Release_Vulkan|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release|x64.ActiveCfg = Release|x64
-		{81F7E26D-5845-4A29-B087-EADF26C49A80}.Release|x64.Build.0 = Release|x64
+		{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}.Debug|x64.ActiveCfg = Debug|x64
+		{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}.Debug|x64.Build.0 = Debug|x64
+		{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}.Release|x64.ActiveCfg = Release|x64
+		{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}.Release|x64.Build.0 = Release|x64
+		{BB158F73-7096-4DF3-97C7-2703151633C3}.Debug|x64.ActiveCfg = Debug|x64
+		{BB158F73-7096-4DF3-97C7-2703151633C3}.Debug|x64.Build.0 = Debug|x64
+		{BB158F73-7096-4DF3-97C7-2703151633C3}.Release|x64.ActiveCfg = Release|x64
+		{BB158F73-7096-4DF3-97C7-2703151633C3}.Release|x64.Build.0 = Release|x64
+		{2C5A5DA6-EF06-4920-A26F-632AA20C98AD}.Debug|x64.ActiveCfg = Debug|x64
+		{2C5A5DA6-EF06-4920-A26F-632AA20C98AD}.Debug|x64.Build.0 = Debug|x64
+		{2C5A5DA6-EF06-4920-A26F-632AA20C98AD}.Release|x64.ActiveCfg = Release|x64
+		{2C5A5DA6-EF06-4920-A26F-632AA20C98AD}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
