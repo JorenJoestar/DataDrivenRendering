@@ -2,42 +2,42 @@ shader Lines {
 
     layout {
         vertex main3D {
-            binding 0 16
-            attribute float3 Position 0 0 0 vertex
-            attribute ubyte4n Color 0 1 12 vertex
+            binding 0 16 vertex
+            attribute float3 Position 0 0 0 
+            attribute ubyte4n Color 0 1 12
         }
 
         vertex main3DPosition {
-            binding 0 12
-            attribute float3 Position 0 0 0 vertex
+            binding 0 12 vertex
+            attribute float3 Position 0 0 0
         }
 
         vertex main3DPositionNormal {
-            binding 0 12
-            binding 1 12
-            binding 3 64
-            attribute float3 Position 0 0 0 vertex
-            attribute float3 Normal 1 1 0 vertex
-            attribute float4 InstanceTransform 3 3 0 instance
-            attribute float4 InstanceTransform 3 4 16 instance
-            attribute float4 InstanceTransform 3 5 32 instance
-            attribute float4 InstanceTransform 3 6 48 instance
+            binding 0 12 vertex
+            binding 1 12 vertex
+            binding 3 64 instance
+            attribute float3 Position 0 0 0
+            attribute float3 Normal 1 1 0
+            attribute float4 InstanceTransform 3 3 0
+            attribute float4 InstanceTransform 3 4 16
+            attribute float4 InstanceTransform 3 5 32
+            attribute float4 InstanceTransform 3 6 48
         }
 
         vertex instancedLines {
-            binding 0 32
-            attribute float3 point_a 0 0 0 instance
-            attribute ubyte4n color_a 0 1 12 instance
-            attribute float3 point_b 0 2 16 instance
-            attribute ubyte4n color_b 0 3 28 instance
+            binding 0 32 instance
+            attribute float3 point_a 0 0 0
+            attribute ubyte4n color_a 0 1 12
+            attribute float3 point_b 0 2 16
+            attribute ubyte4n color_b 0 3 28
         }
 
         vertex instancedLines2D {
-            binding 0 24
-            attribute float2 point_a 0 0 0 instance
-            attribute ubyte4n color_a 0 1 8 instance
-            attribute float2 point_b 0 2 12 instance
-            attribute ubyte4n color_b 0 3 20 instance
+            binding 0 24 instance
+            attribute float2 point_a 0 0 0
+            attribute ubyte4n color_a 0 1 8
+            attribute float2 point_b 0 2 12
+            attribute ubyte4n color_b 0 3 20
         }
     }
 

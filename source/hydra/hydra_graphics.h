@@ -803,7 +803,6 @@ struct VertexAttribute {
     uint16_t                        binding             = 0;
     uint32_t                        offset              = 0;
     VertexComponentFormat::Enum     format              = VertexComponentFormat::Count;
-    VertexInputRate::Enum           input_rate          = VertexInputRate::Count;
 
 }; // struct VertexAttribute
 
@@ -813,6 +812,7 @@ struct VertexStream {
 
     uint16_t                        binding             = 0;
     uint16_t                        stride              = 0;
+    VertexInputRate::Enum           input_rate          = VertexInputRate::Count;
 
 }; // struct VertexStream
 

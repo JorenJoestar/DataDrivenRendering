@@ -14,10 +14,10 @@ shader ImGui {
         }
 
         vertex main {
-            binding 0 20
-            attribute float2 Position 0 0 0 vertex
-            attribute float2 UV 0 1 8 vertex
-            attribute ubyte4n Color 0 2 16 vertex
+            binding 0 20 vertex
+            attribute float2 Position 0 0 0 
+            attribute float2 UV 0 1 8
+            attribute ubyte4n Color 0 2 16
         }
 
     }

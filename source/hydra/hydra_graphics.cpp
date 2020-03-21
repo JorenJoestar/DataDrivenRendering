@@ -1319,14 +1319,17 @@ PipelineHandle Device::create_pipeline( const PipelineCreation& creation ) {
         glCreateVertexArrays( 1, &pipeline->gl_vao );
         glBindVertexArray( pipeline->gl_vao );
 
+        for ( uint32_t i = 0; i < vertex_input.num_streams; i++ ) {
+            const VertexStream& stream = vertex_input.vertex_streams[i];
+            glVertexBindingDivisor( stream.binding, stream.input_rate == VertexInputRate::PerVertex ? 0 : 1 );
+        }
+
         for ( uint32_t i = 0; i < vertex_input.num_attributes; i++ ) {
             const VertexAttribute& attribute = vertex_input.vertex_attributes[i];
             glEnableVertexAttribArray( attribute.location );
             glVertexAttribFormat( attribute.location, to_gl_components( attribute.format ), to_gl_vertex_type( attribute.format ),
                                   to_gl_vertex_norm( attribute.format ), attribute.offset );
             glVertexAttribBinding( attribute.location, attribute.binding );
-
-            glVertexBindingDivisor( attribute.binding, attribute.input_rate == VertexInputRate::PerVertex ? 0 : 1 );
         }
 
         glBindVertexArray( 0 );

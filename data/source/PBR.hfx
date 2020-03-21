@@ -11,40 +11,40 @@ shader PBR {
 
     layout {
         vertex main3D {
-            binding 0 16
-            attribute float3 Position 0 0 0 vertex
-            attribute ubyte4n Color 0 1 12 vertex
+            binding 0 16 vertex
+            attribute float3 Position 0 0 0
+            attribute ubyte4n Color 0 1 12
         }
 
         vertex main3DPosition {
-            binding 0 12
-            attribute float3 Position 0 0 0 vertex
+            binding 0 12 vertex
+            attribute float3 Position 0 0 0
         }
 
         vertex main3DPositionNormal {
-            binding 0 12
-            binding 1 12
-            binding 3 64
-            attribute float3 Position 0 0 0 vertex
-            attribute float3 Normal 1 1 0 vertex
-            attribute float4 InstanceTransform 3 3 0 instance
-            attribute float4 InstanceTransform 3 4 16 instance
-            attribute float4 InstanceTransform 3 5 32 instance
-            attribute float4 InstanceTransform 3 6 48 instance
+            binding 0 12 vertex
+            binding 1 12 vertex
+            binding 3 64 instance
+            attribute float3 Position 0 0 0
+            attribute float3 Normal 1 1 0
+            attribute float4 InstanceTransform 3 3 0
+            attribute float4 InstanceTransform 3 4 16
+            attribute float4 InstanceTransform 3 5 32
+            attribute float4 InstanceTransform 3 6 48
         }
 
         vertex gbuffer {
-            binding 0 12
-            binding 1 12
-            binding 2 8
-            binding 3 64
-            attribute float3 Position 0 0 0 vertex
-            attribute float3 Normal 1 1 0 vertex
-            attribute float2 UV 2 2 0 vertex
-            attribute float4 InstanceTransform 3 3 0 instance
-            attribute float4 InstanceTransform 3 4 16 instance
-            attribute float4 InstanceTransform 3 5 32 instance
-            attribute float4 InstanceTransform 3 6 48 instance
+            binding 0 12 vertex
+            binding 1 12 vertex
+            binding 2 8 vertex
+            binding 3 64 instance
+            attribute float3 Position 0 0 0
+            attribute float3 Normal 1 1 0
+            attribute float2 UV 2 2 0
+            attribute float4 InstanceTransform 3 3 0
+            attribute float4 InstanceTransform 3 4 16
+            attribute float4 InstanceTransform 3 5 32
+            attribute float4 InstanceTransform 3 6 48
         }
 
         list gbuffer {

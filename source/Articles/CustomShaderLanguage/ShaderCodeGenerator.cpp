@@ -615,14 +615,6 @@ void vertex_attribute_identifier( Parser* parser, Token& token, hydra::graphics:
     get_data( *parser->lexer->data_buffer, data_index, value );
 
     attribute.offset = (uint16_t)value;
-
-    // Parse frequency (vertex or instance)
-    next_token( parser->lexer, token );
-    if ( expect_keyword( token.text, 6, "vertex" ) ) {
-        attribute.input_rate = hydra::graphics::VertexInputRate::PerVertex;
-    } else if ( expect_keyword( token.text, 8, "instance" ) ) {
-        attribute.input_rate = hydra::graphics::VertexInputRate::PerInstance;
-    }
 }
 
 //
@@ -640,6 +632,14 @@ void vertex_binding_identifier( Parser* parser, Token& token, hydra::graphics::V
     data_index = parser->lexer->data_buffer->current_entries - 1;
     get_data( *parser->lexer->data_buffer, data_index, value );
     stream.stride = (uint16_t)value;
+
+    // Parse frequency (vertex or instance)
+    next_token( parser->lexer, token );
+    if ( expect_keyword( token.text, 6, "vertex" ) ) {
+        stream.input_rate = hydra::graphics::VertexInputRate::PerVertex;
+    } else if ( expect_keyword( token.text, 8, "instance" ) ) {
+        stream.input_rate = hydra::graphics::VertexInputRate::PerInstance;
+    }
 }
 
 //
