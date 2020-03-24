@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\dirent.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\enkits\LockLessMultiReadPipe.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\enkits\TaskScheduler.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_application.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_graphics.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_imgui.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_lexer.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_lib.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\hydra\hydra_shaderfx.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imconfig.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imgui.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imgui_impl_sdl.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imgui_internal.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imgui_memory_editor.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\stb_image.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\imgui\TextEditor.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick.config.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_common.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.freebsd.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.linux.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.macos.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.platform.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_core.win.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_gpu.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_memory.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_message.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_miniz.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_serialization.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\optick\optick_server.h" />
+    <ClInclude Include="..\source\Articles\ShaderAugmentation\stb_ds.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\enkits\TaskScheduler.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_application.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_graphics.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_imgui.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_lexer.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_lib.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\hydra\hydra_shaderfx.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui_impl_sdl.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\imgui\TextEditor.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_core.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_gpu.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_gpu.d3d12.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_gpu.vulkan.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_message.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_miniz.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_serialization.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\optick\optick_server.cpp" />
+    <ClCompile Include="..\source\Articles\ShaderAugmentation\shader_augmentation.cpp" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{790ABFF8-4F8B-4938-AF6E-A34549B28569}</ProjectGuid>
+    <RootNamespace>DataDrivenRendering</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <ProjectName>ShaderAugmentation</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\Bin\</OutDir>
+    <IntDir>Build\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)..\Bin\</OutDir>
+    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\source\articles\shaderaugmentation\;..\source\articles\shaderaugmentation\imgui\;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;</AdditionalIncludeDirectories>
+      <ExceptionHandling>false</ExceptionHandling>
+      <PreprocessorDefinitions>HYDRA_OPENGL;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(LIB_PATH)\SDL2-2.0.9\lib\x64;$(LIB_PATH)\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Shlwapi.lib;opengl32.lib;glew32.lib;SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\source;..\source\imgui;..\source\rapidjson;$(LIB_PATH)\SDL2-2.0.9\include;$(LIB_PATH)\glew-2.1.0\include;..\source\NodeEditor\Include;..\source\BlueprintUtilities\Include;..\source\BlueprintUtilities\Source</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>HYDRA_OPENGL;_CRT_SECURE_NO_WARNINGS;IMGUI_IMPL_OPENGL_LOADER_GLEW;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(LIB_PATH)\SDL2-2.0.9\lib\x64;$(LIB_PATH)\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glew32.lib;SDL2.lib;SDL2main.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

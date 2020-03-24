@@ -196,7 +196,7 @@ shader PBR {
 
         layout (location = 0) in vec3 Position;
 
-        uniform ViewConstants { 
+        layout (std140, binding=0) uniform ViewConstants { 
             mat4                    view_projection_matrix;
             mat4                    projection_matrix;
             vec4                    resolution;

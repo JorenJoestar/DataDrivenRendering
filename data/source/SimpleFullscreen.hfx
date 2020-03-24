@@ -287,17 +287,39 @@ shader SimpleFullscreen {
         layout(binding=0) uniform sampler2D input_texture;
 
         void main() {
-            vec3 color = texture2D(input_texture, vTexCoord.xy).xyz;
+            vec3 color = texture(input_texture, vTexCoord.xy).xyz;
             outColor = vec4(1, 1, 0, 1);
             outColor = vec4(color, 1);
         }
         #endif // FRAGMENT
     }
 
+    glsl SolidColor {
+        in vec4 vTexCoord;
+
+        out vec4 outColor;
+
+        void main() {
+            #if defined (OPTION_RED)
+            outColor = vec4(1, 0, 0, 1);
+            #elif defined (OPTION_GREEN)
+            outColor = vec4(1, 0, 0, 1);
+            #elif defined (OPTION_BLUE)
+            outColor = vec4(1, 0, 0, 1);
+            #else
+            outColor = vec4(1, 1, 1, 1);
+            #endif
+
+            #if defined (OPTION_INVERTED)
+            outColor.rgb = vec3(1, 1, 1) - outColor.rgb;
+            #endif
+        }
+    }
+
     pipeline = computeTest
 
     pass FillTexture {
-        dispatch = 32, 32, 1
+        dispatch = (32, 32, 1)
         stage = compute0
         resources = LocalCompute
         compute = ComputeTest
@@ -311,9 +333,18 @@ shader SimpleFullscreen {
     }
 
     pass DeferredCompute {
-        dispatch = 32, 32, 1
+        dispatch = (32, 32, 1)
         resources = DeferredCompute
         compute = DeferredCompute
+    }
+
+    pass SolidColor {
+        stage = final
+        resources = Local
+        vertex = ToScreen
+        fragment = SolidColor
+        options = (red, green, blue)
+        options = (standard, inverted)
     }
 }
 
