@@ -14,7 +14,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{C1F2F31E-C8B6-40B9-85CA-4B456660C62B}</ProjectGuid>
     <RootNamespace>DataDrivenRendering</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
     <ProjectName>RenderPipelines</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -110,9 +110,6 @@
     <ClCompile Include="..\source\ShaderCodeGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\data\brdf.h" />
-    <ClInclude Include="..\data\math.h" />
-    <ClInclude Include="..\data\Platform.h" />
     <ClInclude Include="..\source\CodeGenerator.h" />
     <ClInclude Include="..\source\Deprecated.h" />
     <ClInclude Include="..\source\hydra\hydra_application.h" />
@@ -124,20 +121,6 @@
     <ClInclude Include="..\source\Lexer.h" />
     <ClInclude Include="..\source\ShaderCodeGenerator.h" />
     <ClInclude Include="..\source\stb_ds.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\data\FullscreenTexture.hfx" />
-    <None Include="..\data\ImGui.hfx" />
-    <None Include="..\data\LanternPost_Mat.hmt" />
-    <None Include="..\data\Lines.hfx" />
-    <None Include="..\data\Material_MR.hmt" />
-    <None Include="..\data\PBR.hfx" />
-    <None Include="..\data\ShaderToy.hfx" />
-    <None Include="..\data\SimpleFullscreen.hfx" />
-    <None Include="..\data\SimpleFullscreen.hmt" />
-    <None Include="..\data\StarNest.hfx" />
-    <None Include="..\data\StarNest.hmt" />
-    <None Include="..\data\Swapchain.hmt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
