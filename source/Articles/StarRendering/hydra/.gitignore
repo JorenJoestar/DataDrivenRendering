@@ -2,9 +2,8 @@
 /[Bb]uild/
 /[Dd]ebug/
 /[Rr]elease/
+/**/[Bb]uild/
 /**/.vs/
-/**/x64/
-/**/x86/
 
 # MSVC user extensions
 *.opensdf
@@ -25,3 +24,7 @@
 *.ini
 *.exe
 *.ilk
+*.bhfx
+*.sbhr
+*.mbhr
+*.tbhr

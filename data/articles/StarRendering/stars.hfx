@@ -1,0 +1,247 @@
+shader stars {
+
+    layout {
+        list Local {
+            cbuffer ViewConstants ViewConstants;
+        }
+
+        list Lines {
+            cbuffer LocalConstants LocalConstants;
+            texture2D mask;
+        }
+
+        vertex main3D {
+            binding 0 32 instance
+            attribute float4 Position 0 0 0
+            attribute float4 ColorData 0 1 16
+        }
+
+        vertex instancedLines {
+            binding 0 32 instance
+            attribute float3 point_a 0 0 0
+            attribute ubyte4n color_a 0 1 12
+            attribute float3 point_b 0 2 16
+            attribute ubyte4n color_b 0 3 28
+        }
+    }
+
+    render_states {
+        state alpha {
+            Cull None
+            ZTest Always
+            ZWrite Off
+            BlendMode Alpha
+        }
+
+        state linesZTest {
+            Cull None
+            ZTest LEqual
+            ZWrite Off
+            BlendMode Alpha
+        }
+    }
+    
+    glsl to_screen {
+
+        #pragma include "Platform.h"
+
+        layout (std140, binding=0) uniform ViewConstants {
+            mat4                    view_projection_matrix;
+            mat4                    star_rotation_matrix;
+
+            vec4                    camera_up;
+            vec4                    camera_right;
+
+            vec4                    data;       // x = min_radius, y = glare scale, z = radius scale, w = distance scale
+        };
+
+        #if defined VERTEX
+        layout (location = 0) in  vec4 position;
+        layout (location = 1) in  vec4 color_data;
+
+        layout (location = 0) out vec4 vTexCoord;
+        layout (location = 1) out vec3 vColor;
+
+        // Per vertex positions and uvs of a quad
+        vec3 positions[6]       = vec3[6]( vec3(-0.5,-0.5,0), vec3(0.5,-0.5,0), vec3(0.5, 0.5, 0), vec3(0.5, 0.5, 0), vec3(-0.5,0.5,0), vec3(-0.5,-0.5,0) );
+        vec2 uvs[6]             = vec2[6]( vec2(0.0, 1.0),    vec2(1.0, 1.0),   vec2(1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 0.0), vec2(0.0, 1.0) );
+
+        const float _35OVER13PI = 0.85698815511020565414014334123662;
+
+        void main() {
+
+            // Calculate color based on magnitude
+            // Following paper "Single Pass Rendering of Day and Night Sky Phenomena"
+            float m = position.w;
+            float m_a = 7.0f;       // Average apparent magnitude
+
+            float delta_m = pow(2.512, m_a - m);
+
+            float i_t = delta_m * _35OVER13PI;
+            i_t *= 4e-7 / (data.x * data.x);  // resolution correlated 
+            i_t = min(1.167, i_t);  // volume of smoothstep (V_T)
+
+            // Day-Twilight-Night-Intensity Mapping (Butterworth-Filter)
+            //float b = 1.0 / sqrt(1 + pow(sun.z + 1.14, 32));
+            //i_t *= b;
+
+            if ( i_t < 0.01 )
+                return;
+
+            float i_g = pow(2.512, m_a - (m + 0.167)) - 1;
+            vec3 v_t = vec3(i_t);
+
+            // v_k
+            const float glare_scale = data.y;
+            const float v_k = max(data.x, sqrt(i_g) * 2e-2 * glare_scale);
+
+            // TODO: Scattering and Scintillation
+            //v_t -= E_ext;
+            vTexCoord.w = v_k / data.x;
+
+            //
+            vColor = mix( color_data.xyz, vec3( 0.66, 0.78, 1.00 ), 0.66 );
+            vColor *= v_t;
+            vColor = max(vec3(0.0), vColor);
+
+            const uint vertex_index = gl_VertexID % 6;
+
+            vTexCoord.xy = positions[vertex_index].xy * vec2(-1, 1);
+
+            float particle_size = v_k * data.z;
+            vec3 scaled_billboard = vTexCoord.x * particle_size * camera_right.xyz + vTexCoord.y * particle_size * camera_up.xyz;
+    
+            vec4 final_position = star_rotation_matrix * vec4(position.xyz, 1) + vec4(scaled_billboard.xyz, 1);
+
+            gl_Position = view_projection_matrix * vec4(final_position.xyz, 1.0f);
+
+        }
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) in vec4 vTexCoord;
+        layout (location = 1) in vec3 vColor;
+
+        layout (location = 0) out vec4 outColor;
+
+        void main() {
+            float x = vTexCoord.x;
+            float y = vTexCoord.y;
+
+            float zz = (1 - x * x - y * y);
+            if ( zz < 0.0 )
+                discard;
+
+            float k = vTexCoord.w;
+            float l = length(vec2(x, y));
+
+            const float radius_scale = data.w;
+            const float glare_scale = data.y;
+            float t = 1 - smoothstep(0.0, 1.0, l * k / radius_scale);
+            float g = 1 - pow(l, glare_scale / 64.0);
+
+            float intensity = max(t, g);
+            outColor = vec4(intensity * vColor, intensity);
+        }
+        #endif // FRAGMENT
+    }
+
+
+    glsl InstancedLines3D {
+        #pragma include "Platform.h"
+
+        layout (std140, binding=0) uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+            vec4                    data;       // data.x = line width; data.y = alpha mask scale
+        };
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 point_a;
+        layout (location = 1) in uvec4 color_a;
+        layout (location = 2) in vec3 point_b;
+        layout (location = 3) in uvec4 color_b;
+
+        layout (location = 0) out vec4 Frag_Color;
+        layout (location = 1) out vec2 UV;
+
+        vec2 segment_instance_geometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
+        vec2 uv[6] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 0), vec2(1, 1), vec2(0, 1)};
+
+        float expansion_direction[6] = { 1, -1, -1, 1, -1, 1 };
+
+        void main()
+        {
+            vec2 position = segment_instance_geometry[gl_VertexID % 6];
+            const float width = data.x;
+
+            vec4 clip0 = view_projection_matrix * vec4(point_a, 1.0);
+            vec4 clip1 = view_projection_matrix * vec4(point_b, 1.0);
+
+            vec2 screen0 = resolution.xy * ((0.5 * (clip0.xy/clip0.w)) + 0.5);
+            vec2 screen1 = resolution.xy * ((0.5 * (clip1.xy/clip1.w)) + 0.5);
+
+            vec2 xBasis = normalize(screen1 - screen0);
+            vec2 yBasis = vec2(-xBasis.y, xBasis.x);
+            vec2 pt0 = screen0 + width * (position.x * xBasis + position.y * yBasis);
+            vec2 pt1 = screen1 + width * (position.x * xBasis + position.y * yBasis);
+            vec2 pt = mix(pt0, pt1, position.x);
+
+            vec4 clip = mix(clip0, clip1, position.x);
+
+            gl_Position = vec4(clip.w * ((2.0 * pt) * resolution.zw - 1.0), clip.z, clip.w);
+
+            Frag_Color = mix(color_a / 255.0f, color_b / 255.0f, position.x);
+
+            UV = uv[gl_VertexID % 6];
+        }
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) in vec4 Frag_Color;
+        layout (location = 1) in vec2 UV;
+        
+        layout (location = 0) out vec4 Out_Color;
+
+        layout (binding = 1) uniform sampler2D mask_texture;
+        
+        void main()
+        {
+            vec4 col = Frag_Color;
+
+            const float alpha_mask_scale = data.y;
+            // Texture is inverted.
+            float mask = clamp(1 - texture(mask_texture, UV.xy).a * alpha_mask_scale, 0, 1);
+            if ( mask < 0.01f )
+                discard;
+
+            col.a *= mask;
+            Out_Color = col;
+        }
+        #endif // FRAGMENT
+    }
+
+    pipeline = Default
+
+    pass stars_to_screen {
+        stage = final
+        resources = Local
+        vertex_layout = main3D
+        vertex = to_screen
+        fragment = to_screen
+        render_states = alpha
+    }
+
+    pass stars_InstancedLines3D {
+        resources = Lines
+        render_states = linesZTest
+        vertex_layout = instancedLines
+        vertex = InstancedLines3D
+        fragment = InstancedLines3D
+    }
+}
