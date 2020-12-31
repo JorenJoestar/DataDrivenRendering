@@ -205,6 +205,7 @@ struct StarMapApplication : public hydra::Application {
 
     void                            line( const vec3s& from, const vec3s& to, uint32_t color0, uint32_t color1 );   // Draw 3D lines
 
+    char*                           star_catalogue_data;
     BrightStarEntry*                star_catalogue;
     uint32_t                        star_count;
 

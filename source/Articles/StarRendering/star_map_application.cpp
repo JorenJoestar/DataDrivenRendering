@@ -263,17 +263,13 @@ void StarMapApplication::app_init() {
 
     ////////////////////////////////
     // Init astrolonomical data
-    char* star_catalogue_data = hydra::file_read_into_memory( "..\\data\\articles\\StarRendering\\bsc5.bin", nullptr, false, *allocator );
+    star_catalogue_data = hydra::file_read_into_memory( "..\\data\\articles\\StarRendering\\bsc5.bin", nullptr, false, *allocator );
 
     BrighStarCatalogueHeader* header = (BrighStarCatalogueHeader*)star_catalogue_data;
 
     star_count = abs( header->star_count );
 
-    star_catalogue = (BrightStarEntry*)allocator->allocate( star_count * sizeof( BrightStarEntry ), 1 );
-    memcpy( star_catalogue, (star_catalogue_data + sizeof( BrighStarCatalogueHeader )), star_count * sizeof( BrightStarEntry ) );
-
-    allocator->free_( star_catalogue_data );
-
+    star_catalogue = ( BrightStarEntry* )( star_catalogue_data + sizeof( BrighStarCatalogueHeader ) );
 #if defined STAR_OUTPUT_ENTRIES
     for ( uint32_t i = 0; i < star_count; i++ ) {
         const BrightStarEntry& star_entry_data = star_catalogue[i];
@@ -285,7 +281,8 @@ void StarMapApplication::app_init() {
 
     // Read constellation file
     char* constellation_data = hydra::file_read_into_memory( "..\\data\\articles\\StarRendering\\constellations_lines.txt", nullptr, false, *allocator );
-
+    // Allocate raw memory and entries for the data parsed.
+    // Not elegant, but functioning.
     DataBuffer data_buffer;
     data_buffer_init( &data_buffer, 10000, 10000 * 4 );
 
@@ -296,6 +293,10 @@ void StarMapApplication::app_init() {
     uint32_t data_size = 0;
     bool parsing = true;
 
+    // An example entry:
+    // Ant   4 4273 4104 3871 3765
+    // Hash is used as line comment.
+    //
     while ( parsing ) {
 
         Token token;
@@ -313,6 +314,7 @@ void StarMapApplication::app_init() {
 
             case Token::Token_Identifier:
             {
+                // Ant   4 4273 4104 3871 3765
                 // Read name
                 char name[ 4 ];
                 name[ 0 ] = toupper( token.text.text[ 0 ] );
@@ -565,7 +567,7 @@ void StarMapApplication::app_terminate() {
 
     gpu_device->destroy_texture( capsule_texture );
 
-    hydra::memory_get_system_allocator()->free_( star_catalogue );
+    hydra::memory_get_system_allocator()->free_( star_catalogue_data );
 }
 
 void StarMapApplication::app_update( hydra::ApplicationUpdate& update ) {
@@ -581,9 +583,7 @@ void StarMapApplication::app_update( hydra::ApplicationUpdate& update ) {
     double local_mean_sidereal_time = 4.894961f + 230121.675315f * T + longitude_radians;
 
     // Exploration of different rotations
-    static bool ry_invert = false;
-
-    versors rotation_y = ry_invert ? glms_quatv( latitude_radians - GLM_PI_2f, { 1, 0, 0 } ) : glms_quatv( latitude_radians - GLM_PI_2f, { 0, 1, 0 } );
+    versors rotation_y = glms_quatv( latitude_radians - GLM_PI_2f, { 0, 1, 0 } );
     versors rotation_z = glms_quatv( -local_mean_sidereal_time, { 0, 0, 1 } );
 
     static bool rotation_order_invert = false;
@@ -641,6 +641,8 @@ void StarMapApplication::app_update( hydra::ApplicationUpdate& update ) {
     gpu_commands->bind_resource_list( sort_key++, &star_resource_list, 1, nullptr, 0 );
 
     uint32_t star_count_to_render = star_count;
+    gpu_commands->draw( sort_key++, TopologyType::Triangle, 0, 6, 0, star_count_to_render );
+
     // Render only the choosen constellation
     if ( show_all_constellations ) {
 
@@ -651,8 +653,7 @@ void StarMapApplication::app_update( hydra::ApplicationUpdate& update ) {
             // Add constellation rendering
             draw_constellation_lines( ce, star_rotation_matrix );
         }
-    }
-    else if ( chosen_constellation != Constellations::Abbreviations::Count_Abbr ) {
+    } else if ( chosen_constellation != Constellations::Abbreviations::Count_Abbr ) {
 
         const int32_t constellation_index = Constellations::get_index( &constellations, Constellations::to_string( chosen_constellation ) );
         const Constellations::ConstellationEntry& ce = constellations.entries[ constellation_index ];
@@ -661,7 +662,6 @@ void StarMapApplication::app_update( hydra::ApplicationUpdate& update ) {
         draw_constellation_lines( ce, star_rotation_matrix );
     }
 
-    gpu_commands->draw( sort_key++, TopologyType::Triangle, 0, 6, 0, star_count_to_render );
 
     // Draw view orientation axis.
     // Calculate a decentered world position for the starting point.
