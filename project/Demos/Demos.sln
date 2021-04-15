@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.30804.86
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "StarMap", "StarMap.vcxproj", "{55E570DD-9495-4E0A-A339-93549C2BDDB4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PixelArtFiltering", "PixelArtFiltering.vcxproj", "{417804C0-F62D-4483-B9C4-A4049B80ECF7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,6 +17,10 @@ Global
 		{55E570DD-9495-4E0A-A339-93549C2BDDB4}.Debug|x64.Build.0 = Debug|x64
 		{55E570DD-9495-4E0A-A339-93549C2BDDB4}.Release|x64.ActiveCfg = Release|x64
 		{55E570DD-9495-4E0A-A339-93549C2BDDB4}.Release|x64.Build.0 = Release|x64
+		{417804C0-F62D-4483-B9C4-A4049B80ECF7}.Debug|x64.ActiveCfg = Debug|x64
+		{417804C0-F62D-4483-B9C4-A4049B80ECF7}.Debug|x64.Build.0 = Debug|x64
+		{417804C0-F62D-4483-B9C4-A4049B80ECF7}.Release|x64.ActiveCfg = Release|x64
+		{417804C0-F62D-4483-B9C4-A4049B80ECF7}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

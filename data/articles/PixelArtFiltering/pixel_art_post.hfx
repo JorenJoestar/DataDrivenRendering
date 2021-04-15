@@ -1,0 +1,77 @@
+shader pixel_art {
+
+	layout {
+        list Local {
+            texture2D albedo;
+        }
+
+        list crt {
+            cbuffer Locals Locals;
+            texture2D albedo;
+        }
+    }
+
+    render_states {
+
+        state fullscreen {
+            Cull None
+            ZTest Always
+            ZWrite Off
+        }
+    }
+
+    glsl pass_through {
+
+        #pragma include "Platform.h"
+
+        #if defined VERTEX
+
+        layout (location = 0) out vec2 vTexCoord;
+
+        void main() {
+
+            vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+            gl_Position = vec4(vTexCoord.xy * 2.0f - 1.0f, 0.0f, 1.0f);
+            gl_Position.y = -gl_Position.y;
+        }
+
+        
+        #endif // VERTEX
+
+
+        #if defined FRAGMENT
+
+        layout (location = 0) in vec2 uv;
+
+        layout (location = 0) out vec4 out_color;
+
+        layout (binding = 0) uniform sampler2D albedo;
+
+        void main() {
+
+            vec4 color = texture( albedo, uv.xy );
+            out_color = vec4(color.rgb, 1);
+        }
+
+        #endif // FRAGMENT
+    }
+
+    glsl crt_lottes {
+        #pragma include "crt-lottes-fast.slang"
+    }
+
+    pass pass_through {
+        resources = Local
+        vertex = pass_through
+        fragment = pass_through
+        render_states = fullscreen
+    }
+
+
+    pass crt_lottes {
+        resources = crt
+        vertex = pass_through
+        fragment = crt_lottes
+        render_states = fullscreen
+    }
+}

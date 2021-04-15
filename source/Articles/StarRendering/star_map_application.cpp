@@ -10,7 +10,9 @@
 #include "cglm/struct/affine.h"
 #include "cglm/struct/quat.h"
 
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "stb_image.h"
 
 //#define STAR_OUTPUT_ENTRIES
