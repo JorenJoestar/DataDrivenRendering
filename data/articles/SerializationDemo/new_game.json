@@ -1,0 +1,41 @@
+{
+	"name" : "new_game_scene",
+	"entities" : [
+		{
+			"name" : "cronos_mum",
+			"type" : "npc",
+			"position_x" : -1000.0,
+			"position_y" : 0.0,
+			"offset_z" : 5.0,
+			"rendering" : {
+				"atlas_path" : "data//chrono_trigger_npcs.png",
+				"atlas_entry": 0
+			}
+		},
+		{
+			"name" : "crono",
+			"type" : "npc",
+			"position_x" : 16.0,
+			"position_y" : 0.0,
+			"offset_z" : 5.0,
+			"rendering" : {
+				"atlas_path" : "data//crono_character.png",
+				"atlas_entry" : 0
+			}
+		},
+		{
+			"name" : "cronos_house",
+			"type" : "background",
+			"rendering" : {
+				"atlas_path" : "data//crono_house.png"
+			}
+		},
+		{
+			"name" : "cutscene_manager",
+			"type" : "",
+			"cutscene" : {
+				"path" : "..//data//chrono_newgame.json"
+			}
+		}
+	]
+}

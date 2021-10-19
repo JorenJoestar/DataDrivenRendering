@@ -1,0 +1,99 @@
+{
+	"name":"new_game",
+	"scene": "",
+	"commands" : [
+		{
+			"type" : "fade",
+			"start" : 0.0,
+			"end" : 1.0,
+			"duration" : 0.0
+		},
+		{
+			"type" : "move_entity",
+			"x" : -16,
+			"y" : -8,
+			"instant" : true,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "dialogue",
+			"text" : "{SPEED=0.025}Crono...{PAGE}Crono!{PAGE}Crono, are you still sleeping?{PAGE} "
+		},
+		{
+			"type" : "fade",
+			"start" : 1.0,
+			"end" : 0.0,
+			"duration" : 2
+		},
+		{
+			"type" : "dialogue",
+			"text" : "{SPEED=0.025}Dear me! I had forgotten how beautiful Leene's Bell sounds!{PAGE} "
+		},
+		{
+			"type" : "parallel",
+			"count": 2
+		},
+		{
+			"type" : "move_entity",
+			"x" : 8,
+			"y" : 32,
+			"speed" : 20,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "move_camera",
+			"x" : 30,
+			"y" : 0,
+			"speed" : 1.0
+		},
+		{
+			"type" : "parallel",
+			"count": 1
+		},
+		{
+			"type" : "change_atlas_entry",
+			"entry_name" : "upstairs_bright1",
+			"entity_name" : "cronos_house"
+		},
+		{
+			"type" : "move_entity",
+			"x" : -16,
+			"y" : -8,
+			"speed" : 30,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "move_entity",
+			"x" : -60,
+			"y" : -8,
+			"speed" : 30,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "move_entity",
+			"x" : -64,
+			"y" : -52,
+			"speed" : 30,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "fade",
+			"start" : 0.0,
+			"end" : 1.0,
+			"duration" : 1.0
+		},
+		{
+			"type" : "move_entity",
+			"x" : -1000,
+			"y" : 0,
+			"instant" : true,
+			"entity_name" : "cronos_mum"
+		},
+		{
+			"type" : "fade",
+			"start" : 1.0,
+			"end" : 0.0,
+			"duration" : 1.0
+		}
+	]
+}
