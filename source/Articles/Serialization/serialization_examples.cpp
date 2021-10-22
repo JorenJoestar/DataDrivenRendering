@@ -51,11 +51,11 @@ void compile_cutscene( Allocator* allocator, cstring source, cstring destination
     const u32 num_entries = ( u32 )entries.size();
     blob_size += sizeof( CutsceneEntry ) * num_entries;
 
-    MemoryBlob blob;
-    blob.write<CutsceneBlueprint>( allocator, 0, blob_size, nullptr );
+    BlobSerializer blob;
+    CutsceneBlueprint* root = blob.write_and_prepare<CutsceneBlueprint>( allocator, 0, blob_size );
 
-    // Reserve header
-    CutsceneBlueprint* root = blob.allocate_static<CutsceneBlueprint>();
+    // Reserve root
+    //CutsceneBlueprint* root = blob.allocate_static<CutsceneBlueprint>();
     blob.allocate_and_set( root->entries, num_entries );
 
     std::string name_string;
@@ -142,7 +142,7 @@ void inspect_cutscene( Allocator* allocator, cstring filename ) {
     sizet binary_size;
     char* cutscene_binary = file_read_binary( filename, allocator, &binary_size );
     if ( cutscene_binary ) {
-        MemoryBlob blob;
+        BlobSerializer blob;
         CutsceneBlueprint* cutscene = blob.read<CutsceneBlueprint>( allocator, CutsceneBlueprint::k_version, cutscene_binary, binary_size );
 
         hprint( "Inspecting cutscene %s\n" );
@@ -195,7 +195,7 @@ void inspect_cutscene( Allocator* allocator, cstring filename ) {
 // Scene //////////////////////////////////////////////////////////////////
 
 template<>
-void MemoryBlob::serialize<RenderingBlueprint>( RenderingBlueprint* data ) {
+void BlobSerializer::serialize<RenderingBlueprint>( RenderingBlueprint* data ) {
 
     if ( serializer_version > 0 )
         serialize( &data->v1_padding );
@@ -206,7 +206,7 @@ void MemoryBlob::serialize<RenderingBlueprint>( RenderingBlueprint* data ) {
 }
 
 template<>
-void MemoryBlob::serialize<EntityBlueprint>( EntityBlueprint* data ) {
+void BlobSerializer::serialize<EntityBlueprint>( EntityBlueprint* data ) {
 
     serialize( &data->name );
 
@@ -227,7 +227,7 @@ void MemoryBlob::serialize<EntityBlueprint>( EntityBlueprint* data ) {
 }
 
 template<>
-void MemoryBlob::serialize<SceneBlueprint>( SceneBlueprint* data ) {
+void BlobSerializer::serialize<SceneBlueprint>( SceneBlueprint* data ) {
 
     if ( serializer_version > 0 )
         serialize( &data->name );
@@ -253,26 +253,24 @@ void compile_scene( Allocator* allocator, cstring source, cstring destination ) 
     const u32 num_entries = ( u32 )entries.size();
     blob_size += sizeof( EntityBlueprint ) * num_entries;
 
-    MemoryBlob blob;
+    BlobSerializer blob;
     blob.is_reading = false;
-    blob.write<SceneBlueprint>( allocator, SceneBlueprint::k_version, blob_size, nullptr );
+    SceneBlueprint* root = blob.write_and_prepare<SceneBlueprint>( allocator, SceneBlueprint::k_version, blob_size );
 
-    // Allocate root header
-    SceneBlueprint* header = blob.allocate_static<SceneBlueprint>();
-    blob.allocate_and_set( header->entities, num_entries );
+    blob.allocate_and_set( root->entities, num_entries );
 
     std::string name_string;
 
     // Write name
     parsed_json[ "name" ].get_to( name_string );
-    blob.allocate_and_set( header->name, name_string.c_str() );
+    blob.allocate_and_set( root->name, name_string.c_str() );
 
     // Iterate through all entities
     for ( u32 i = 0; i < num_entries; ++i ) {
         json element = entries[ i ];
         element[ "name" ].get_to( name_string );
 
-        EntityBlueprint& entity = header->entities[ i ];
+        EntityBlueprint& entity = root->entities[ i ];
         blob.allocate_and_set( entity.name, name_string.c_str() );
 
         entity.position.x = element.value( "position_x", 0.0f );
@@ -303,7 +301,7 @@ void inspect_scene( Allocator* allocator, cstring filename ) {
     sizet binary_size;
     char* binary = file_read_binary( filename, allocator, &binary_size );
     if ( binary ) {
-        MemoryBlob blob;
+        BlobSerializer blob;
         SceneBlueprint* scene = blob.read<SceneBlueprint>( allocator, SceneBlueprint::k_version, binary, binary_size );
 
         hprint( "Inspecting scene %s\n", scene->name.c_str() );

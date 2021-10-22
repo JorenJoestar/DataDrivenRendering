@@ -12,7 +12,7 @@ struct vec2s {
 
 // Forward declaration for template specialization.
 template<>
-void MemoryBlob::serialize<vec2s>( vec2s* data );
+void BlobSerializer::serialize<vec2s>( vec2s* data );
 
 
 // Cutscene structs ///////////////////////////////////////////////////////
@@ -77,7 +77,7 @@ struct CutsceneEntry {
 }; // struct CutsceneEntry
 //
 //
-struct CutsceneBlueprint {
+struct CutsceneBlueprint : public Blob {
 
     RelativeArray<CutsceneEntry> entries;
 
@@ -115,7 +115,7 @@ struct EntityBlueprint {
 
 //
 //
-struct SceneBlueprint {
+struct SceneBlueprint : public Blob {
 
     RelativeString                  name;
     RelativeArray<EntityBlueprint>  entities;

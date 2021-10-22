@@ -3,12 +3,35 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-void MemoryBlob::shutdown() {
+void BlobSerializer::write_common( Allocator* allocator_, u32 serializer_version_, sizet size ) {
+    allocator = allocator_;
+    // Allocate memory
+    blob_memory = ( char* )halloca( size + sizeof( BlobHeader ), allocator_ );
+    hy_assert( blob_memory );
+
+    total_size = ( u32 )size + sizeof( BlobHeader );
+    serialized_offset = allocated_offset = 0;
+
+    serializer_version = serializer_version_;
+    // This will be written into the blob
+    data_version = serializer_version_;
+    is_reading = 0;
+    is_mappable = 0;
+
+    // Write header
+    BlobHeader* header = ( BlobHeader* )allocate_static( sizeof( BlobHeader ) );
+    header->version = serializer_version;
+    header->mappable = is_mappable;
+
+    serialized_offset = allocated_offset;
+}
+
+void BlobSerializer::shutdown() {
 
     serialized_offset = allocated_offset = 0;
 }
 
-void MemoryBlob::serialize( char* data ) {
+void BlobSerializer::serialize( char* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( char ) );
     } else {
@@ -18,7 +41,7 @@ void MemoryBlob::serialize( char* data ) {
     serialized_offset += sizeof( char );
 }
 
-void MemoryBlob::serialize( i8* data ) {
+void BlobSerializer::serialize( i8* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( i8 ) );
     } else {
@@ -28,7 +51,7 @@ void MemoryBlob::serialize( i8* data ) {
     serialized_offset += sizeof( i8 );
 }
 
-void MemoryBlob::serialize( u8* data ) {
+void BlobSerializer::serialize( u8* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( u8 ) );
     } else {
@@ -38,7 +61,7 @@ void MemoryBlob::serialize( u8* data ) {
     serialized_offset += sizeof( u8 );
 }
 
-void MemoryBlob::serialize( i16* data ) {
+void BlobSerializer::serialize( i16* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( i16 ) );
     } else {
@@ -48,7 +71,7 @@ void MemoryBlob::serialize( i16* data ) {
     serialized_offset += sizeof( i16 );
 }
 
-void MemoryBlob::serialize( u16* data ) {
+void BlobSerializer::serialize( u16* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( u16 ) );
     } else {
@@ -58,7 +81,7 @@ void MemoryBlob::serialize( u16* data ) {
     serialized_offset += sizeof( u16 );
 }
 
-void MemoryBlob::serialize( i32* data ) {
+void BlobSerializer::serialize( i32* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( i32 ) );
     } else {
@@ -68,7 +91,7 @@ void MemoryBlob::serialize( i32* data ) {
     serialized_offset += sizeof( i32 );
 }
 
-void MemoryBlob::serialize( u32* data ) {
+void BlobSerializer::serialize( u32* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( u32 ) );
     } else {
@@ -78,7 +101,7 @@ void MemoryBlob::serialize( u32* data ) {
     serialized_offset += sizeof( u32 );
 }
 
-void MemoryBlob::serialize( i64* data ) {
+void BlobSerializer::serialize( i64* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( i64 ) );
     } else {
@@ -88,7 +111,7 @@ void MemoryBlob::serialize( i64* data ) {
     serialized_offset += sizeof( i64 );
 }
 
-void MemoryBlob::serialize( u64* data ) {
+void BlobSerializer::serialize( u64* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( u64 ) );
     } else {
@@ -98,7 +121,7 @@ void MemoryBlob::serialize( u64* data ) {
     serialized_offset += sizeof( u64 );
 }
 
-void MemoryBlob::serialize( f32* data ) {
+void BlobSerializer::serialize( f32* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( f32 ) );
     } else {
@@ -107,7 +130,7 @@ void MemoryBlob::serialize( f32* data ) {
     serialized_offset += sizeof( f32 );
 }
 
-void MemoryBlob::serialize( f64* data ) {
+void BlobSerializer::serialize( f64* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( f64 ) );
     } else {
@@ -115,7 +138,7 @@ void MemoryBlob::serialize( f64* data ) {
     }
 }
 
-void MemoryBlob::serialize( bool* data ) {
+void BlobSerializer::serialize( bool* data ) {
     if ( is_reading ) {
         memcpy( data, &blob_memory[ serialized_offset ], sizeof( bool ) );
     } else {
@@ -123,11 +146,11 @@ void MemoryBlob::serialize( bool* data ) {
     }
 }
 
-void MemoryBlob::serialize( cstring data ) {
+void BlobSerializer::serialize( cstring data ) {
     // sizet len = strlen( data );
 }
 
-void MemoryBlob::serialize( RelativeString* data ) {
+void BlobSerializer::serialize( RelativeString* data ) {
 
     if ( is_reading ) {
         // Blob --> Data
@@ -178,7 +201,7 @@ void MemoryBlob::serialize( RelativeString* data ) {
 }
 
 
-void MemoryBlob::serialize( CharArray* data ) {
+void BlobSerializer::serialize( CharArray* data ) {
     if ( is_reading ) {
         // Blob --> Data
         serialize( &data->size );
@@ -202,10 +225,10 @@ void MemoryBlob::serialize( CharArray* data ) {
 
         // Reserve memory
         allocate_static( data->size * sizeof( char ) );
-        // Blob memory contains also the MemoryBlobHeader, so to get the correct source data
+        // Blob memory contains also the BlobHeader, so to get the correct source data
         // we need to remove its size.
         // Remove also the guard size to restore the correct offset.
-        char* source_data = blob_memory + cached_serialized + source_data_offset - sizeof(MemoryBlobHeader) - sizeof( u64 ) * 2;
+        char* source_data = blob_memory + cached_serialized + source_data_offset - sizeof(BlobHeader) - sizeof( u64 ) * 2;
         memcpy( ( char* )data->data, source_data, ( sizet )data->size + 1 );
         hprint( "Found %s\n", data->data );
 
@@ -244,7 +267,7 @@ void MemoryBlob::serialize( CharArray* data ) {
     }
 }
 
-char* MemoryBlob::allocate_static( sizet size ) {
+char* BlobSerializer::allocate_static( sizet size ) {
     // TODO: handle memory reallocation correctly.
     if ( allocated_offset + size >= total_size ) {
         hy_assert( false );
@@ -258,7 +281,7 @@ char* MemoryBlob::allocate_static( sizet size ) {
 }
 
 
-void MemoryBlob::allocate_and_set( CharArray& data, cstring string ) {
+void BlobSerializer::allocate_and_set( CharArray& data, cstring string ) {
 
     if ( !string ) {
         data.relative = 0;
@@ -283,7 +306,7 @@ void MemoryBlob::allocate_and_set( CharArray& data, cstring string ) {
     }
 }
 
-void MemoryBlob::allocate_and_set( RelativeString& string, cstring format, ... ) {
+void BlobSerializer::allocate_and_set( RelativeString& string, cstring format, ... ) {
 
     u32 cached_offset = allocated_offset;
 
@@ -307,7 +330,7 @@ void MemoryBlob::allocate_and_set( RelativeString& string, cstring format, ... )
     string.set( destination_memory + cached_offset, written_chars );
 }
 
-i32 MemoryBlob::get_relative_data_offset( void* data ) {
+i32 BlobSerializer::get_relative_data_offset( void* data ) {
     // data_memory points to the newly allocated data structure to be used at runtime.
     const i32 data_offset_from_start = ( i32 )( ( char* )data - data_memory );
     const i32 data_offset = allocated_offset - data_offset_from_start;

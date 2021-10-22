@@ -14,18 +14,27 @@
 // the file and the root structure is marked as 'relative only', memory mappable is doable and
 // thus serialization is automatic.
 //
-struct MemoryBlobHeader {
+struct BlobHeader {
     u32                 version;
     u32                 mappable;
-}; // struct MemoryBlobHeader
+}; // struct BlobHeader
 
-struct MemoryBlob {
+struct Blob {
+    BlobHeader    header;
+}; // struct Blob
 
-    // Init blob in writing mode.
+struct BlobSerializer {
+
+    
     // Allocate size bytes, set the data version and start writing.
     // Data version will be saved at the beginning of the file.
     template <typename T>
-    void                write( Allocator* allocator, u32 serializer_version, sizet size, T* root_data );
+    T*                  write_and_prepare( Allocator* allocator, u32 serializer_version, sizet size );
+
+    template <typename T>
+    void                write_and_serialize( Allocator* allocator, u32 serializer_version, sizet size, T* root_data );
+
+    void                write_common( Allocator* allocator, u32 serializer_version, sizet size );
 
     // Init blob in reading mode from a chunk of preallocated memory.
     // Size is used to check wheter reading is happening outside of the chunk.
@@ -106,51 +115,44 @@ struct MemoryBlob {
     u16                 is_reading          = 0;
     u16                 is_mappable         = 0;
 
-}; // struct MemoryBlob
+}; // struct BlobSerializer
 
 
 // Implementation /////////////////////////////////////////////////////////
 
 template<typename T>
-void MemoryBlob::write( Allocator* allocator_, u32 serializer_version_, sizet size, T* data ) {
+T* BlobSerializer::write_and_prepare( Allocator* allocator_, u32 serializer_version_, sizet size ) {
 
-    allocator = allocator_;
-    // Allocate memory
-    blob_memory = ( char* )halloca( size + sizeof( MemoryBlobHeader ), allocator_ );
-    hy_assert( blob_memory );
+    write_common( allocator_, serializer_version_, size );
 
-    total_size = ( u32 )size + sizeof( MemoryBlobHeader );
-    serialized_offset = allocated_offset = 0;
+    // Allocate root data
+    allocate_static( sizeof( T ) );
 
-    serializer_version = serializer_version_;
-    // This will be written into the blob
-    data_version = serializer_version_;
-    is_reading = 0;
-    is_mappable = 0;
+    // Manually manage blob serialization.
+    data_memory = nullptr;
 
-    // Write header
-    MemoryBlobHeader* header = ( MemoryBlobHeader* )allocate_static( sizeof( MemoryBlobHeader ) );
-    header->version = serializer_version;
-    header->mappable = is_mappable;
+    return ( T* )blob_memory;
+}
 
-    serialized_offset = allocated_offset;
 
-    // Serialize directly structure
-    if ( data ) {
-        // Save root data memory for offset calculation
-        data_memory = ( char* )data;
-        // Allocate and serialize root data
-        allocate_static( sizeof( T ) );
-        serialize( data );
-    }
-    else {
-        // Manually manage blob serialization.
-        data_memory = nullptr;
-    }
+template<typename T>
+void BlobSerializer::write_and_serialize( Allocator* allocator_, u32 serializer_version_, sizet size, T* data ) {
+
+    hy_assert( data ); // Should always have data passed as parameter!
+
+    write_common( allocator_, serializer_version_, size );
+
+    // Allocate root data
+    allocate_static( sizeof( T ) );
+
+    // Save root data memory for offset calculation
+    data_memory = ( char* )data;
+    // Serialize root data
+    serialize( data );
 }
 
 template<typename T>
-T* MemoryBlob::read( Allocator* allocator_, u32 serializer_version_, char* blob_memory_, sizet size, bool force_serialization ) {
+T* BlobSerializer::read( Allocator* allocator_, u32 serializer_version_, char* blob_memory_, sizet size, bool force_serialization ) {
 
     allocator = allocator_;
     blob_memory = blob_memory_;
@@ -162,14 +164,14 @@ T* MemoryBlob::read( Allocator* allocator_, u32 serializer_version_, char* blob_
     is_reading = 1;
 
     // Read header from blob.
-    MemoryBlobHeader* header = ( MemoryBlobHeader* )blob_memory;
+    BlobHeader* header = ( BlobHeader* )blob_memory;
     data_version = header->version;
     is_mappable = header->mappable;
 
     // If serializer and data are at the same version, no need to serialize.
     // TODO: is mappable should be taken in consideration.
     if ( serializer_version == data_version && !force_serialization ) {
-        return ( T* )( blob_memory + sizeof( MemoryBlobHeader ) );
+        return ( T* )( blob_memory );// +sizeof( BlobHeader ) );
     }
 
     serializer_version = data_version;
@@ -178,7 +180,7 @@ T* MemoryBlob::read( Allocator* allocator_, u32 serializer_version_, char* blob_
     data_memory = ( char* )hallocam( size, allocator );
     T* destination_data = ( T* )data_memory;
 
-    serialized_offset += sizeof( MemoryBlobHeader );
+    serialized_offset += sizeof( BlobHeader );
 
     allocate_static( sizeof( T ) );
     // Read from blob to data
@@ -189,13 +191,13 @@ T* MemoryBlob::read( Allocator* allocator_, u32 serializer_version_, char* blob_
 
 
 template<typename T>
-inline void MemoryBlob::serialize( T* data ) {
+inline void BlobSerializer::serialize( T* data ) {
     // Should not arrive here!
     hy_assert( false );
 }
 
 template<typename T>
-void MemoryBlob::serialize( RelativePointer<T>* data ) {
+void BlobSerializer::serialize( RelativePointer<T>* data ) {
     if ( is_reading ) {
         // READING!
         // Blob --> Data
@@ -250,7 +252,7 @@ void MemoryBlob::serialize( RelativePointer<T>* data ) {
 }
 
 template<typename T>
-inline void MemoryBlob::serialize( RelativeArray<T>* data ) {
+inline void BlobSerializer::serialize( RelativeArray<T>* data ) {
 
     if ( is_reading ) {
         // Blob --> Data
@@ -304,7 +306,7 @@ inline void MemoryBlob::serialize( RelativeArray<T>* data ) {
 }
 
 template<typename T>
-inline void MemoryBlob::serialize( Array<T>* data ) {
+inline void BlobSerializer::serialize( Array<T>* data ) {
 
     if ( is_reading ) {
         // Blob --> Data
@@ -331,7 +333,7 @@ inline void MemoryBlob::serialize( Array<T>* data ) {
         allocate_static( data->size * sizeof( T ) );
 
         // When reading, remove also the guard size to restore the correct offset.
-        serialized_offset = cached_serialized + source_data_offset - sizeof(MemoryBlobHeader) - sizeof(u64) * 2;
+        serialized_offset = cached_serialized + source_data_offset - sizeof(BlobHeader) - sizeof(u64) * 2;
 
         for ( u32 i = 0; i < data->size; ++i ) {
             T* destination = &( ( *data )[ i ] );
@@ -377,12 +379,12 @@ inline void MemoryBlob::serialize( Array<T>* data ) {
 }
 
 template<typename T>
-inline T* MemoryBlob::allocate_static() {
+inline T* BlobSerializer::allocate_static() {
     return ( T* )allocate_static( sizeof( T ) );
 }
 
 template<typename T>
-void MemoryBlob::allocate_and_set( RelativePointer<T>& data, void* source_data ) {
+void BlobSerializer::allocate_and_set( RelativePointer<T>& data, void* source_data ) {
     char* data_memory = allocate_static( sizeof( T ) );
     data.set( data_memory );
 
@@ -392,7 +394,7 @@ void MemoryBlob::allocate_and_set( RelativePointer<T>& data, void* source_data )
 }
 
 template<typename T>
-inline void MemoryBlob::allocate_and_set( RelativeArray<T>& data, u32 num_elements, void* source_data ) {
+inline void BlobSerializer::allocate_and_set( RelativeArray<T>& data, u32 num_elements, void* source_data ) {
     char* data_memory = allocate_static( sizeof( T ) * num_elements );
     data.set( data_memory, num_elements );
 
@@ -402,7 +404,7 @@ inline void MemoryBlob::allocate_and_set( RelativeArray<T>& data, u32 num_elemen
 }
 
 template<typename T>
-inline void MemoryBlob::allocate_and_set( Array<T>& data, u32 num_elements, void* source_data ) {
+inline void BlobSerializer::allocate_and_set( Array<T>& data, u32 num_elements, void* source_data ) {
     u32 array_serialized_offset = (u32)(( char* )( &data ) - blob_memory);
     
     u32 data_offset = allocated_offset - array_serialized_offset;

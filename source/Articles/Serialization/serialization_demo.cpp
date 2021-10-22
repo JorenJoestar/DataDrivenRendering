@@ -132,11 +132,11 @@ void file_write_binary( cstring filename, void* memory, sizet size ) {
 
 // Forward declaration for template specialization.
 template<>
-void MemoryBlob::serialize<vec2s>( vec2s* data );
+void BlobSerializer::serialize<vec2s>( vec2s* data );
 
 // Serialization binary
 template<>
-void MemoryBlob::serialize<vec2s>( vec2s* data ) {
+void BlobSerializer::serialize<vec2s>( vec2s* data ) {
     serialize( &data->x );
     serialize( &data->y );
 }
@@ -150,7 +150,7 @@ struct OtherData {
 };
 
 template<>
-void MemoryBlob::serialize<OtherData>( OtherData* data ) {
+void BlobSerializer::serialize<OtherData>( OtherData* data ) {
     serialize( &data->a );
     serialize( &data->b );
 }
@@ -159,7 +159,7 @@ void MemoryBlob::serialize<OtherData>( OtherData* data ) {
 //
 // First version of the game data.
 // Used to write older binaries and test versioning.
-struct GameDataV0 {
+struct GameDataV0 : public Blob {
     vec2s                   position;
     RelativeArray<u32>      all_effs;
     OtherData               other;
@@ -171,7 +171,7 @@ struct GameDataV0 {
 
 
 template<>
-void MemoryBlob::serialize<GameDataV0>( GameDataV0* data ) {
+void BlobSerializer::serialize<GameDataV0>( GameDataV0* data ) {
     serialize( &data->position );
     serialize( &data->all_effs );
     serialize( &data->other );
@@ -182,7 +182,7 @@ void MemoryBlob::serialize<GameDataV0>( GameDataV0* data ) {
 //
 // Second version of game data.
 // 
-struct GameDataV1 {
+struct GameDataV1 : public Blob {
     vec2s                   position;
     RelativeArray<u32>      all_effs;
     OtherData               other;
@@ -195,7 +195,7 @@ struct GameDataV1 {
 
 
 template<>
-void MemoryBlob::serialize<GameDataV1>( GameDataV1* data ) {
+void BlobSerializer::serialize<GameDataV1>( GameDataV1* data ) {
     serialize( &data->position );
     serialize( &data->all_effs );
     serialize( &data->other );
@@ -208,7 +208,7 @@ void MemoryBlob::serialize<GameDataV1>( GameDataV1* data ) {
 
 //
 //
-struct GameData {
+struct GameData : public Blob {
     vec2s                   position;
     RelativeArray<u32>      all_effs;
     OtherData               other;
@@ -222,7 +222,7 @@ struct GameData {
 }; // struct GameData
 
 template<>
-void MemoryBlob::serialize<GameData>( GameData* data ) {
+void BlobSerializer::serialize<GameData>( GameData* data ) {
     serialize( &data->position );
     serialize( &data->all_effs );
     serialize( &data->other );
@@ -260,7 +260,7 @@ int main() {
     inspect_scene( allocator, "..//data//bin//new_game.bin" );
 
     // 2. Write GameDataV0 binary
-    MemoryBlob write_blob_v0, read_blob_v0;
+    BlobSerializer write_blob_v0, read_blob_v0;
     {
         // NOTE: this is a non-optimal way of writing the blob, but still doable.
         // Write V0 and read with GameData (V2)
@@ -287,7 +287,7 @@ int main() {
         // Calculate the offset for the pointer
         writing_data->other_pointer.set( ( char* )other_pointer );
         // Write to blob using serialization methods, by passing the writing data.
-        write_blob_v0.write( allocator, 0, 1000, writing_data );
+        write_blob_v0.write_and_serialize( allocator, 0, 1000, writing_data );
 
         // 
         GameData* game_data = read_blob_v0.read<GameData>( allocator, GameData::k_version, write_blob_v0.blob_memory, write_blob_v0.allocated_offset * 2 );
@@ -303,13 +303,12 @@ int main() {
         }
     }
     // Write GameDataV1 binary
-    MemoryBlob write_blob_v1, read_blob_v1;
+    BlobSerializer write_blob_v1, read_blob_v1;
     {
         // Use write blob to already fill the data.
         // Allocate just a blob with 200 bytes
-        write_blob_v1.write<GameDataV1>( allocator, 1, 200, nullptr );
+        GameDataV1* game_data_v1 = write_blob_v1.write_and_prepare<GameDataV1>( allocator, 1, 200 );
 
-        GameDataV1* game_data_v1 = ( GameDataV1* )write_blob_v1.allocate_static( sizeof( GameDataV1 ) );
         game_data_v1->position.x = 700.f;
         game_data_v1->position.y = 42.f;
 
@@ -349,11 +348,10 @@ int main() {
     }
 
     // Write GameDataV2 binary
-    MemoryBlob write_blob_v2, read_blob_v2, read_blob_v2_serialized;
+    BlobSerializer write_blob_v2, read_blob_v2, read_blob_v2_serialized;
     {
-        write_blob_v2.write<GameData>( allocator, GameData::k_version, 300, nullptr );
+        GameData* game_data = write_blob_v2.write_and_prepare<GameData>( allocator, GameData::k_version, 300 );
 
-        GameData* game_data = ( GameData* )write_blob_v2.allocate_static( sizeof( GameData ) );
         game_data->position.x = 700.f;
         game_data->position.y = 42.f;
 
