@@ -1,0 +1,111 @@
+shader debug_rendering {
+
+    layout {
+        
+        vertex main3D {
+            binding 0 32 instance
+            attribute float4 Position 0 0 0
+            attribute float4 ColorData 0 1 16
+        }
+
+        vertex instancedLines {
+            binding 0 32 instance
+            attribute float3 point_a 0 0 0
+            attribute ubyte4n color_a 0 1 12
+            attribute float3 point_b 0 2 16
+            attribute ubyte4n color_b 0 3 28
+        }
+    }
+
+    render_states {
+        state alpha {
+            Cull None
+            ZTest Always
+            ZWrite Off
+            BlendMode Alpha
+        }
+
+        state linesZTest {
+            Cull None
+            ZTest LEqual
+            ZWrite Off
+            BlendMode Alpha
+        }
+    }
+    
+    glsl InstancedLines3D {
+        #pragma include "Platform.h"
+
+        layout (std140, binding=0) uniform LocalConstants { 
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix;
+            vec4                    resolution;
+            vec4                    data;       // data.x = line width; data.y = alpha mask scale
+        };
+
+        #if defined VERTEX
+
+        layout (location = 0) in vec3 point_a;
+        layout (location = 1) in uvec4 color_a;
+        layout (location = 2) in vec3 point_b;
+        layout (location = 3) in uvec4 color_b;
+
+        layout (location = 0) out vec4 Frag_Color;
+        layout (location = 1) out vec2 UV;
+
+        vec2 segment_instance_geometry[6] = { vec2(0, -0.5), vec2(1, -0.5), vec2(1, 0.5), vec2(0, -0.5), vec2(1, 0.5), vec2(0, 0.5)};
+        vec2 uv[6] = { vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 0), vec2(1, 1), vec2(0, 1)};
+
+        float expansion_direction[6] = { 1, -1, -1, 1, -1, 1 };
+
+        void main()
+        {
+            vec2 position = segment_instance_geometry[gl_VertexID % 6];
+            const float width = data.x;
+
+            vec4 clip0 = view_projection_matrix * vec4(point_a, 1.0);
+            vec4 clip1 = view_projection_matrix * vec4(point_b, 1.0);
+
+            vec2 screen0 = resolution.xy * ((0.5 * (clip0.xy/clip0.w)) + 0.5);
+            vec2 screen1 = resolution.xy * ((0.5 * (clip1.xy/clip1.w)) + 0.5);
+
+            vec2 xBasis = normalize(screen1 - screen0);
+            vec2 yBasis = vec2(-xBasis.y, xBasis.x);
+            vec2 pt0 = screen0 + width * (position.x * xBasis + position.y * yBasis);
+            vec2 pt1 = screen1 + width * (position.x * xBasis + position.y * yBasis);
+            vec2 pt = mix(pt0, pt1, position.x);
+
+            vec4 clip = mix(clip0, clip1, position.x);
+
+            gl_Position = vec4(clip.w * ((2.0 * pt) * resolution.zw - 1.0), clip.z, clip.w);
+
+            Frag_Color = mix(color_a / 255.0f, color_b / 255.0f, position.x);
+
+            UV = uv[gl_VertexID % 6];
+        }
+
+        #endif // VERTEX
+
+        #if defined FRAGMENT
+
+        layout (location = 0) in vec4 Frag_Color;
+        layout (location = 1) in vec2 UV;
+        
+        layout (location = 0) out vec4 Out_Color;
+
+        void main()
+        {
+            vec4 col = Frag_Color;
+            Out_Color = col;
+        }
+        #endif // FRAGMENT
+    }
+    
+    pass InstancedLines3D {
+        resources = Lines
+        render_states = linesZTest
+        vertex_layout = instancedLines
+        vertex = InstancedLines3D
+        fragment = InstancedLines3D
+    }
+}

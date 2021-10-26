@@ -111,22 +111,15 @@
 #define GLM_VEC3_ONE  ((vec3)GLM_VEC3_ONE_INIT)
 #define GLM_VEC3_ZERO ((vec3)GLM_VEC3_ZERO_INIT)
 
-#define GLM_YUP  ((vec3){0.0f, 1.0f, 0.0f})
-#define GLM_ZUP  ((vec3){0.0f, 0.0f, 1.0f})
-#define GLM_XUP  ((vec3){1.0f, 0.0f, 0.0f})
+#define GLM_YUP       ((vec3){0.0f,  1.0f,  0.0f})
+#define GLM_ZUP       ((vec3){0.0f,  0.0f,  1.0f})
+#define GLM_XUP       ((vec3){1.0f,  0.0f,  0.0f})
+#define GLM_FORWARD   ((vec3){0.0f,  0.0f, -1.0f})
 
 #define GLM_XXX GLM_SHUFFLE3(0, 0, 0)
 #define GLM_YYY GLM_SHUFFLE3(1, 1, 1)
 #define GLM_ZZZ GLM_SHUFFLE3(2, 2, 2)
 #define GLM_ZYX GLM_SHUFFLE3(0, 1, 2)
-
-CGLM_INLINE
-void
-glm_vec3( float x, float y, float z, vec3 dest ) {
-    dest[0] = x;
-    dest[1] = y;
-    dest[2] = z;
-}
 
 /*!
  * @brief init vec3 using vec4
@@ -585,10 +578,12 @@ glm_vec3_normalize_to(vec3 v, vec3 dest) {
 CGLM_INLINE
 void
 glm_vec3_cross(vec3 a, vec3 b, vec3 dest) {
+  vec3 c;
   /* (u2.v3 - u3.v2, u3.v1 - u1.v3, u1.v2 - u2.v1) */
-  dest[0] = a[1] * b[2] - a[2] * b[1];
-  dest[1] = a[2] * b[0] - a[0] * b[2];
-  dest[2] = a[0] * b[1] - a[1] * b[0];
+  c[0] = a[1] * b[2] - a[2] * b[1];
+  c[1] = a[2] * b[0] - a[0] * b[2];
+  c[2] = a[0] * b[1] - a[1] * b[0];
+  glm_vec3_copy(c, dest);
 }
 
 /*!
@@ -814,9 +809,10 @@ glm_vec3_minv(vec3 a, vec3 b, vec3 dest) {
 CGLM_INLINE
 void
 glm_vec3_ortho(vec3 v, vec3 dest) {
-  dest[0] = v[1] - v[2];
-  dest[1] = v[2] - v[0];
-  dest[2] = v[0] - v[1];
+  float ignore;
+  float f      = modff(fabsf(v[0]) + 0.5f, &ignore);
+  vec3  result = {-v[1], v[0] - f * v[2], f * v[1]};
+  glm_vec3_copy(result, dest);
 }
 
 /*!

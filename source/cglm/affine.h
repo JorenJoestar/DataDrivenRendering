@@ -40,10 +40,6 @@
 #include "mat4.h"
 #include "affine-mat.h"
 
-CGLM_INLINE
-void
-glm_mat4_mul(mat4 m1, mat4 m2, mat4 dest);
-
 /*!
  * @brief translate existing transform matrix by v vector
  *        and stores result in same matrix
@@ -54,26 +50,22 @@ glm_mat4_mul(mat4 m1, mat4 m2, mat4 dest);
 CGLM_INLINE
 void
 glm_translate(mat4 m, vec3 v) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
+#if defined(CGLM_SIMD)
+  glmm_128 m0, m1, m2, m3;
+
+  m0 = glmm_load(m[0]);
+  m1 = glmm_load(m[1]);
+  m2 = glmm_load(m[2]);
+  m3 = glmm_load(m[3]);
+
   glmm_store(m[3],
-             _mm_add_ps(_mm_add_ps(_mm_mul_ps(glmm_load(m[0]),
-                                              _mm_set1_ps(v[0])),
-                                   _mm_mul_ps(glmm_load(m[1]),
-                                              _mm_set1_ps(v[1]))),
-                        _mm_add_ps(_mm_mul_ps(glmm_load(m[2]),
-                                              _mm_set1_ps(v[2])),
-                                   glmm_load(m[3]))))
-  ;
+             glmm_fmadd(m0, glmm_set1(v[0]),
+                        glmm_fmadd(m1, glmm_set1(v[1]),
+                                   glmm_fmadd(m2, glmm_set1(v[2]), m3))));
 #else
-  vec4 v1, v2, v3;
-
-  glm_vec4_scale(m[0], v[0], v1);
-  glm_vec4_scale(m[1], v[1], v2);
-  glm_vec4_scale(m[2], v[2], v3);
-
-  glm_vec4_add(v1, m[3], m[3]);
-  glm_vec4_add(v2, m[3], m[3]);
-  glm_vec4_add(v3, m[3], m[3]);
+  glm_vec4_muladds(m[0], v[0], m[3]);
+  glm_vec4_muladds(m[1], v[1], m[3]);
+  glm_vec4_muladds(m[2], v[2], m[3]);
 #endif
 }
 
@@ -103,12 +95,8 @@ glm_translate_to(mat4 m, vec3 v, mat4 dest) {
 CGLM_INLINE
 void
 glm_translate_x(mat4 m, float x) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(m[3],
-             _mm_add_ps(_mm_mul_ps(glmm_load(m[0]),
-                                   _mm_set1_ps(x)),
-                        glmm_load(m[3])))
-  ;
+#if defined(CGLM_SIMD)
+  glmm_store(m[3], glmm_fmadd(glmm_load(m[0]), glmm_set1(x), glmm_load(m[3])));
 #else
   vec4 v1;
   glm_vec4_scale(m[0], x, v1);
@@ -125,12 +113,8 @@ glm_translate_x(mat4 m, float x) {
 CGLM_INLINE
 void
 glm_translate_y(mat4 m, float y) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(m[3],
-             _mm_add_ps(_mm_mul_ps(glmm_load(m[1]),
-                                   _mm_set1_ps(y)),
-                        glmm_load(m[3])))
-  ;
+#if defined(CGLM_SIMD)
+  glmm_store(m[3], glmm_fmadd(glmm_load(m[1]), glmm_set1(y), glmm_load(m[3])));
 #else
   vec4 v1;
   glm_vec4_scale(m[1], y, v1);
@@ -147,12 +131,8 @@ glm_translate_y(mat4 m, float y) {
 CGLM_INLINE
 void
 glm_translate_z(mat4 m, float z) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(m[3],
-             _mm_add_ps(_mm_mul_ps(glmm_load(m[2]),
-                                   _mm_set1_ps(z)),
-                        glmm_load(m[3])))
-  ;
+#if defined(CGLM_SIMD)
+  glmm_store(m[3], glmm_fmadd(glmm_load(m[2]), glmm_set1(z), glmm_load(m[3])));
 #else
   vec4 v1;
   glm_vec4_scale(m[2], z, v1);
@@ -459,7 +439,7 @@ glm_decompose_rs(mat4 m, mat4 r, vec3 s) {
   glm_vec4_scale(r[1], 1.0f/s[1], r[1]);
   glm_vec4_scale(r[2], 1.0f/s[2], r[2]);
 
-  /* Note from Apple Open Source (asume that the matrix is orthonormal):
+  /* Note from Apple Open Source (assume that the matrix is orthonormal):
      check for a coordinate system flip.  If the determinant
      is -1, then negate the matrix and the scaling factors. */
   glm_vec3_cross(m[0], m[1], v);

@@ -16,6 +16,7 @@
    CGLM_INLINE versors glms_quat_init(float x, float y, float z, float w)
    CGLM_INLINE versors glms_quatv(float angle, vec3s axis)
    CGLM_INLINE versors glms_quat(float angle, float x, float y, float z)
+   CGLM_INLINE versors glms_quat_from_vecs(vec3s a, vec3s b)
    CGLM_INLINE float   glms_quat_norm(versors q)
    CGLM_INLINE versors glms_quat_normalize(versors q)
    CGLM_INLINE float   glms_quat_dot(versors p, versors q)
@@ -34,6 +35,7 @@
    CGLM_INLINE mat3s   glms_quat_mat3t(versors q)
    CGLM_INLINE versors glms_quat_lerp(versors from, versors to, float t)
    CGLM_INLINE versors glms_quat_lerpc(versors from, versors to, float t)
+   CGLM_INLINE versors glms_quat_nlerp(versors from, versors to, float t)
    CGLM_INLINE versors glms_quat_slerp(versors from, versors to, float t)
    CGLM_INLINE mat4s.  glms_quat_look(vec3s eye, versors ori)
    CGLM_INLINE versors glms_quat_for(vec3s dir, vec3s fwd, vec3s up)
@@ -147,9 +149,24 @@ glms_quat(float angle, float x, float y, float z) {
 }
 
 /*!
+ * @brief compute quaternion rotating vector A to vector B
+ *
+ * @param[in]   a     vec3 (must have unit length)
+ * @param[in]   b     vec3 (must have unit length)
+ * @returns     quaternion (of unit length)
+ */
+CGLM_INLINE
+versors
+glms_quat_from_vecs(vec3s a, vec3s b) {
+  versors dest;
+  glm_quat_from_vecs(a.raw, b.raw, dest.raw);
+  return dest;
+}
+
+/*!
  * @brief returns norm (magnitude) of quaternion
  *
- * @param[out]  q  quaternion
+ * @param[in]  q  quaternion
  */
 CGLM_INLINE
 float
@@ -403,6 +420,24 @@ glms_quat_lerpc(versors from, versors to, float t) {
 
 /*!
  * @brief interpolates between two quaternions
+ *        taking the shortest rotation path using
+ *        normalized linear interpolation (NLERP)
+ *
+ * @param[in]   from  from
+ * @param[in]   to    to
+ * @param[in]   t     interpolant (amount)
+ * @returns result quaternion
+ */
+CGLM_INLINE
+versors
+glms_quat_nlerp(versors from, versors to, float t) {
+  versors dest;
+  glm_quat_nlerp(from.raw, to.raw, t, dest.raw);
+  return dest;
+}
+
+/*!
+ * @brief interpolates between two quaternions
  *        using spherical linear interpolation (SLERP)
  *
  * @param[in]   from  from
@@ -437,15 +472,14 @@ glms_quat_look(vec3s eye, versors ori) {
  * @brief creates look rotation quaternion
  *
  * @param[in]   dir   direction to look
- * @param[in]   fwd   forward vector
  * @param[in]   up    up vector
  * @returns  destination quaternion
  */
 CGLM_INLINE
 versors
-glms_quat_for(vec3s dir, vec3s fwd, vec3s up) {
+glms_quat_for(vec3s dir, vec3s up) {
   versors dest;
-  glm_quat_for(dir.raw, fwd.raw, up.raw, dest.raw);
+  glm_quat_for(dir.raw, up.raw, dest.raw);
   return dest;
 }
 
@@ -455,15 +489,14 @@ glms_quat_for(vec3s dir, vec3s fwd, vec3s up) {
  *
  * @param[in]   from  source point
  * @param[in]   to    destination point
- * @param[in]   fwd   forward vector
  * @param[in]   up    up vector
  * @returns  destination quaternion
  */
 CGLM_INLINE
 versors
-glms_quat_forp(vec3s from, vec3s to, vec3s fwd, vec3s up) {
+glms_quat_forp(vec3s from, vec3s to, vec3s up) {
   versors dest;
-  glm_quat_forp(from.raw, to.raw, fwd.raw, up.raw, dest.raw);
+  glm_quat_forp(from.raw, to.raw, up.raw, dest.raw);
   return dest;
 }
 

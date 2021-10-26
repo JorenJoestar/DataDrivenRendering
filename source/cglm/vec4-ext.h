@@ -92,10 +92,10 @@ glm_vec4_eq(vec4 v, float val) {
 CGLM_INLINE
 bool
 glm_vec4_eq_eps(vec4 v, float val) {
-  return fabsf(v[0] - val) <= FLT_EPSILON
-         && fabsf(v[1] - val) <= FLT_EPSILON
-         && fabsf(v[2] - val) <= FLT_EPSILON
-         && fabsf(v[3] - val) <= FLT_EPSILON;
+  return fabsf(v[0] - val) <= GLM_FLT_EPSILON
+         && fabsf(v[1] - val) <= GLM_FLT_EPSILON
+         && fabsf(v[2] - val) <= GLM_FLT_EPSILON
+         && fabsf(v[3] - val) <= GLM_FLT_EPSILON;
 }
 
 /*!
@@ -106,9 +106,7 @@ glm_vec4_eq_eps(vec4 v, float val) {
 CGLM_INLINE
 bool
 glm_vec4_eq_all(vec4 v) {
-  return v[0] == v[1]
-         && v[0] == v[2]
-         && v[0] == v[3];
+  return glm_vec4_eq_eps(v, v[0]);
 }
 
 /*!
@@ -135,10 +133,10 @@ glm_vec4_eqv(vec4 a, vec4 b) {
 CGLM_INLINE
 bool
 glm_vec4_eqv_eps(vec4 a, vec4 b) {
-  return fabsf(a[0] - b[0]) <= FLT_EPSILON
-         && fabsf(a[1] - b[1]) <= FLT_EPSILON
-         && fabsf(a[2] - b[2]) <= FLT_EPSILON
-         && fabsf(a[3] - b[3]) <= FLT_EPSILON;
+  return fabsf(a[0] - b[0]) <= GLM_FLT_EPSILON
+         && fabsf(a[1] - b[1]) <= GLM_FLT_EPSILON
+         && fabsf(a[2] - b[2]) <= GLM_FLT_EPSILON
+         && fabsf(a[3] - b[3]) <= GLM_FLT_EPSILON;
 }
 
 /*!
@@ -226,10 +224,10 @@ glm_vec4_sign(vec4 v, vec4 dest) {
 
   x0 = glmm_load(v);
   x1 = _mm_set_ps(0.0f, 0.0f, 1.0f, -1.0f);
-  x2 = glmm_shuff1x(x1, 2);
+  x2 = glmm_splat(x1, 2);
 
-  x3 = _mm_and_ps(_mm_cmpgt_ps(x0, x2), glmm_shuff1x(x1, 1));
-  x4 = _mm_and_ps(_mm_cmplt_ps(x0, x2), glmm_shuff1x(x1, 0));
+  x3 = _mm_and_ps(_mm_cmpgt_ps(x0, x2), glmm_splat(x1, 1));
+  x4 = _mm_and_ps(_mm_cmplt_ps(x0, x2), glmm_splat(x1, 0));
 
   glmm_store(dest, _mm_or_ps(x3, x4));
 #else
@@ -270,10 +268,10 @@ glm_vec4_abs(vec4 v, vec4 dest) {
 CGLM_INLINE
 void
 glm_vec4_fract(vec4 v, vec4 dest) {
-  dest[0] = fminf(v[0] - floorf(v[0]), 0x1.fffffep-1f);
-  dest[1] = fminf(v[1] - floorf(v[1]), 0x1.fffffep-1f);
-  dest[2] = fminf(v[2] - floorf(v[2]), 0x1.fffffep-1f);
-  dest[3] = fminf(v[3] - floorf(v[3]), 0x1.fffffep-1f);
+  dest[0] = fminf(v[0] - floorf(v[0]), 0.999999940395355224609375f);
+  dest[1] = fminf(v[1] - floorf(v[1]), 0.999999940395355224609375f);
+  dest[2] = fminf(v[2] - floorf(v[2]), 0.999999940395355224609375f);
+  dest[3] = fminf(v[3] - floorf(v[3]), 0.999999940395355224609375f);
 }
 
 /*!

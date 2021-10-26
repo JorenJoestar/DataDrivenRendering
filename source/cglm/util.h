@@ -289,7 +289,7 @@ glm_smoothinterpc(float from, float to, float t) {
 CGLM_INLINE
 bool
 glm_eq(float a, float b) {
-  return fabsf(a - b) <= FLT_EPSILON;
+  return fabsf(a - b) <= GLM_FLT_EPSILON;
 }
 
 /*!
@@ -322,7 +322,22 @@ glm_percent(float from, float to, float current) {
 CGLM_INLINE
 float
 glm_percentc(float from, float to, float current) {
-  return glm_clamp(glm_percent(from, to, current), 0.0f, 1.0f);
+  return glm_clamp_zo(glm_percent(from, to, current));
+}
+
+/*!
+* @brief swap two float values
+*
+* @param[in]   a float value 1 (pointer)
+* @param[in]   b float value 2 (pointer)
+*/
+CGLM_INLINE
+void
+glm_swapf(float * __restrict a, float * __restrict b) {
+  float t;
+  t  = *a;
+  *a = *b;
+  *b = t;
 }
 
 #endif /* cglm_util_h */

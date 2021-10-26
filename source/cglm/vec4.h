@@ -473,8 +473,8 @@ glm_vec4_scale_as(vec4 v, float s, vec4 dest) {
 CGLM_INLINE
 void
 glm_vec4_div(vec4 a, vec4 b, vec4 dest) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(dest, _mm_div_ps(glmm_load(a), glmm_load(b)));
+#if defined(CGLM_SIMD)
+  glmm_store(dest, glmm_div(glmm_load(a), glmm_load(b)));
 #else
   dest[0] = a[0] / b[0];
   dest[1] = a[1] / b[1];
@@ -568,14 +568,8 @@ glm_vec4_subadd(vec4 a, vec4 b, vec4 dest) {
 CGLM_INLINE
 void
 glm_vec4_muladd(vec4 a, vec4 b, vec4 dest) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(dest, _mm_add_ps(glmm_load(dest),
-                              _mm_mul_ps(glmm_load(a),
-                                         glmm_load(b))));
-#elif defined(CGLM_NEON_FP)
-  vst1q_f32(dest, vaddq_f32(vld1q_f32(dest),
-                            vmulq_f32(vld1q_f32(a),
-                                      vld1q_f32(b))));
+#if defined(CGLM_SIMD)
+  glmm_store(dest, glmm_fmadd(glmm_load(a), glmm_load(b), glmm_load(dest)));
 #else
   dest[0] += a[0] * b[0];
   dest[1] += a[1] * b[1];
@@ -596,14 +590,8 @@ glm_vec4_muladd(vec4 a, vec4 b, vec4 dest) {
 CGLM_INLINE
 void
 glm_vec4_muladds(vec4 a, float s, vec4 dest) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
-  glmm_store(dest, _mm_add_ps(glmm_load(dest),
-                              _mm_mul_ps(glmm_load(a),
-                                         _mm_set1_ps(s))));
-#elif defined(CGLM_NEON_FP)
-  vst1q_f32(dest, vaddq_f32(vld1q_f32(dest),
-                            vsubq_f32(vld1q_f32(a),
-                                      vdupq_n_f32(s))));
+#if defined(CGLM_SIMD)
+  glmm_store(dest, glmm_fmadd(glmm_load(a), glmm_set1(s), glmm_load(dest)));
 #else
   dest[0] += a[0] * s;
   dest[1] += a[1] * s;
@@ -680,7 +668,7 @@ glm_vec4_negate_to(vec4 v, vec4 dest) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   glmm_store(dest, _mm_xor_ps(glmm_load(v), _mm_set1_ps(-0.0f)));
 #elif defined(CGLM_NEON_FP)
-  vst1q_f32(dest, veorq_s32(vld1q_f32(v), vdupq_n_f32(-0.0f)));
+  vst1q_f32(dest, vnegq_f32(vld1q_f32(v)));
 #else
   dest[0] = -v[0];
   dest[1] = -v[1];

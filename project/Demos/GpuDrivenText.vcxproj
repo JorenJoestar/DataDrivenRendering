@@ -17,7 +17,6 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -53,25 +52,23 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
-  <ImportGroup Label="Shared" >
+  <ImportGroup Label="Shared">
   </ImportGroup>
-    <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-      <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    </ImportGroup>
-    <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-      <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    </ImportGroup>
-    <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-      <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    </ImportGroup>
-    <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-      <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    </ImportGroup>
-
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -81,11 +78,16 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\Bin\</OutDir>
+    <IntDir>Build\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\Bin\</OutDir>
+    <IntDir>Build\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
   </PropertyGroup>
-
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -118,12 +120,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>sdl2.lib;vulkan-1.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\lib;$(LIB_PATH)\SDL2-2.0.12\lib\x64</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -132,18 +137,126 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\lib;$(LIB_PATH)\SDL2-2.0.12\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sdl2.lib;vulkan-1.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-
-  <ItemGroup></ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\source\Articles\GpuDrivenText\main.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\application.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\game_application.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\hydra_imgui.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\hydra_input.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\input.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\keys.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\application\window.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\external\tlsf.c" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\animation.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\camera.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\command_buffer.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\debug_renderer.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_device.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_device_vulkan.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_resources.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\hydra_shaderfx.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\renderer.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\sprite_batch.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\assert.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\bit.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\blob_serialization.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\data_structures.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\file.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\hydra_lib.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\lexer.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\log.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\memory.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\numerics.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\process.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\serialization.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\service.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\service_manager.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\string.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\time.cpp" />
+    <ClCompile Include="..\..\source\imgui\imgui.cpp" />
+    <ClCompile Include="..\..\source\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\source\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\source\imgui\imgui_impl_sdl.cpp" />
+    <ClCompile Include="..\..\source\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\source\imgui\TextEditor.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\source\hydra_next\source\application\application.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\game_application.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\hydra_application.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\hydra_imgui.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\hydra_input.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\input.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\keys.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\application\window.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\external\stb_image.h" />
+    <ClInclude Include="..\..\source\hydra_next\source\external\tlsf.h" />
+    <ClInclude Include="..\..\source\hydra_next\source\external\vk_mem_alloc.h" />
+    <ClInclude Include="..\..\source\hydra_next\source\external\wyhash.h" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\animation.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\camera.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\command_buffer.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\debug_renderer.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_device.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_device_vulkan.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_enum.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_enum_vulkan.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_resources.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\gpu_resources_vulkan.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\hydra_graphics.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\hydra_shaderfx.h" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\renderer.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\graphics\sprite_batch.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\array.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\assert.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\bit.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\blob.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\blob_serialization.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\data_structures.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\file.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\hash_map.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\hydra_lib.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\lexer.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\log.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\memory.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\memory_utils.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\numerics.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\platform.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\primitive_types.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\process.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\relative_data_structures.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\serialization.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\service.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\service_manager.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\string.hpp" />
+    <ClInclude Include="..\..\source\hydra_next\source\kernel\time.hpp" />
+    <ClInclude Include="..\..\source\imgui\imconfig.h" />
+    <ClInclude Include="..\..\source\imgui\imgui.h" />
+    <ClInclude Include="..\..\source\imgui\imgui_impl_sdl.h" />
+    <ClInclude Include="..\..\source\imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\source\imgui\imgui_memory_editor.h" />
+    <ClInclude Include="..\..\source\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\source\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\source\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\source\imgui\stb_image.h" />
+    <ClInclude Include="..\..\source\imgui\TextEditor.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\source\imgui\LICENSE.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -187,8 +187,29 @@ glm_mat4_identity_array(mat4 * __restrict mat, size_t count) {
 CGLM_INLINE
 void
 glm_mat4_zero(mat4 mat) {
+#ifdef __AVX__
+  __m256 y0;
+  y0 = _mm256_setzero_ps();
+  glmm_store256(mat[0], y0);
+  glmm_store256(mat[2], y0);
+#elif defined( __SSE__ ) || defined( __SSE2__ )
+  glmm_128 x0;
+  x0 = _mm_setzero_ps();
+  glmm_store(mat[0], x0);
+  glmm_store(mat[1], x0);
+  glmm_store(mat[2], x0);
+  glmm_store(mat[3], x0);
+#elif defined(CGLM_NEON_FP)
+  glmm_128 x0;
+  x0 = vdupq_n_f32(0.0f);
+  vst1q_f32(mat[0], x0);
+  vst1q_f32(mat[1], x0);
+  vst1q_f32(mat[2], x0);
+  vst1q_f32(mat[3], x0);
+#else
   CGLM_ALIGN_MAT mat4 t = GLM_MAT4_ZERO_INIT;
   glm_mat4_copy(t, mat);
+#endif
 }
 
 /*!
@@ -358,6 +379,8 @@ void
 glm_mat4_mulv(mat4 m, vec4 v, vec4 dest) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   glm_mat4_mulv_sse2(m, v, dest);
+#elif defined(CGLM_NEON_FP)
+  glm_mat4_mulv_neon(m, v, dest);
 #else
   vec4 res;
   res[0] = m[0][0] * v[0] + m[1][0] * v[1] + m[2][0] * v[2] + m[3][0] * v[3];
@@ -476,6 +499,8 @@ void
 glm_mat4_transpose_to(mat4 m, mat4 dest) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   glm_mat4_transp_sse2(m, dest);
+#elif defined(CGLM_NEON_FP)
+  glm_mat4_transp_neon(m, dest);
 #else
   dest[0][0] = m[0][0]; dest[1][0] = m[0][1];
   dest[0][1] = m[1][0]; dest[1][1] = m[1][1];
@@ -498,6 +523,8 @@ void
 glm_mat4_transpose(mat4 m) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   glm_mat4_transp_sse2(m, m);
+#elif defined(CGLM_NEON_FP)
+  glm_mat4_transp_neon(m, m);
 #else
   mat4 d;
   glm_mat4_transpose_to(m, d);
@@ -533,15 +560,12 @@ glm_mat4_scale_p(mat4 m, float s) {
 CGLM_INLINE
 void
 glm_mat4_scale(mat4 m, float s) {
-#if defined( __SSE__ ) || defined( __SSE2__ )
+#ifdef __AVX__
+  glm_mat4_scale_avx(m, s);
+#elif defined( __SSE__ ) || defined( __SSE2__ )
   glm_mat4_scale_sse2(m, s);
 #elif defined(CGLM_NEON_FP)
-  float32x4_t v0;
-  v0 = vdupq_n_f32(s);
-  vst1q_f32(m[0], vmulq_f32(vld1q_f32(m[0]), v0));
-  vst1q_f32(m[1], vmulq_f32(vld1q_f32(m[1]), v0));
-  vst1q_f32(m[2], vmulq_f32(vld1q_f32(m[2]), v0));
-  vst1q_f32(m[3], vmulq_f32(vld1q_f32(m[3]), v0));
+  glm_mat4_scale_neon(m, s);
 #else
   glm_mat4_scale_p(m, s);
 #endif
@@ -559,6 +583,8 @@ float
 glm_mat4_det(mat4 mat) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   return glm_mat4_det_sse2(mat);
+#elif defined(CGLM_NEON_FP)
+  return glm_mat4_det_neon(mat);
 #else
   /* [square] det(A) = det(At) */
   float t[6];
@@ -592,6 +618,8 @@ void
 glm_mat4_inv(mat4 mat, mat4 dest) {
 #if defined( __SSE__ ) || defined( __SSE2__ )
   glm_mat4_inv_sse2(mat, dest);
+#elif defined(CGLM_NEON_FP)
+  glm_mat4_inv_neon(mat, dest);
 #else
   float t[6];
   float det;

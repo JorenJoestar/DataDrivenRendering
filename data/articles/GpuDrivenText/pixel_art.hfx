@@ -1,0 +1,156 @@
+shader pixel_art {
+
+	layout {
+        
+        vertex sprite_instance {
+            binding 0 48 instance
+            attribute float4 position 0 0 0
+            attribute float4 uv_size_offset 0 1 16
+            attribute float4 size 0 2 32
+        }
+    }
+
+    render_states {
+        state sprite {
+            Cull None
+            ZTest LEqual
+            ZWrite On
+        }
+
+        state fullscreen {
+            Cull None
+            ZTest Always
+            ZWrite Off
+        }
+
+        state transparent {
+            Cull None
+            ZTest Always
+            ZWrite Off
+            BlendMode Alpha
+        }
+    }
+
+	glsl main_forward {
+
+		struct LocalConstants {
+            mat4                    view_projection_matrix;
+            mat4                    projection_matrix_2d;
+        };
+
+        layout (std140, binding=0)
+        uniform Local{
+    		LocalConstants  locals;
+    	};
+
+        #if defined VERTEX
+        layout (location = 0) in vec4 position;
+        layout (location = 1) in vec4 uv_size_offset;
+        layout (location = 2) in vec4 size_ssflag_alpha;
+
+        layout (location = 0) out vec4 uv_alpha;
+
+        #pragma include "debug_gpu_font.h"
+
+        // Per vertex positions and uvs of a quad
+        vec3 positions[6]       = vec3[6]( vec3(-0.5,-0.5,0), vec3(0.5,-0.5,0), vec3(0.5, 0.5, 0), vec3(0.5, 0.5, 0), vec3(-0.5,0.5,0), vec3(-0.5,-0.5,0) );
+        vec2 uvs[6]             = vec2[6]( vec2(0.0, 1.0),    vec2(1.0, 1.0),   vec2(1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 0.0), vec2(0.0, 1.0) );
+
+        void main() {
+
+            const uint vertex_index = gl_VertexID % 6;
+            // Calculate UVs
+            uv_alpha.xy = uvs[vertex_index];
+            uv_alpha.xy = uv_alpha.xy * uv_size_offset.xy + uv_size_offset.zw;
+            // Facing
+            const float facing = position.w;
+            // Sprite size
+            const vec2 sprite_size = size_ssflag_alpha.xy;
+            // Calculate world position
+            vec4 world_position = vec4( vec2(positions[ vertex_index ].xy * sprite_size * vec2(facing, size_ssflag_alpha.z > 0 ? -1 : 1)), 0, 1 );
+            world_position.xyz += position.xyz;
+
+            uv_alpha.z = size_ssflag_alpha.w;
+
+            gl_Position = size_ssflag_alpha.z > 0 ? locals.projection_matrix_2d * world_position : locals.view_projection_matrix * world_position;
+
+            if ( vertex_index == 0 ) {
+                uint entry_index = atomicAdd(current_entry_index, 1);
+                uint data_index = atomicAdd(current_data_index, 16);
+
+                entries[entry_index].x = STRWIDTH(5);
+                entries[entry_index].y = STRHEIGHT(5);
+                entries[entry_index].offset = data_index;
+                entries[entry_index].count = 16;
+
+                data[data_index] = ch_p;
+                data[data_index + 1] = ch_o;
+                data[data_index + 2] = ch_s;
+                data[data_index + 3] = ch_spc;
+                data[data_index + 4] = get_digit(position.x, 2);
+                data[data_index + 5] = get_digit(position.x, 1);
+                data[data_index + 6] = get_digit(position.x, 0);
+                data[data_index + 7] = ch_per;
+                data[data_index + 8] = get_digit(position.x, -1);
+                data[data_index + 9] = ch_com;
+                data[data_index + 10] = get_digit(position.y, 2);
+                data[data_index + 11] = get_digit(position.y, 1);
+                data[data_index + 12] = get_digit(position.y, 0);
+                data[data_index + 13] = ch_per;
+                data[data_index + 14] = get_digit(position.y, -1);
+                data[data_index + 15] = ch_spc;
+            }
+        }
+        
+        #endif // VERTEX
+
+
+        #if defined FRAGMENT
+
+        layout (location = 0) in vec4 uv_alpha;
+
+        layout (location = 0) out vec4 out_color;
+
+        layout (binding = 1) uniform sampler2D albedo;
+
+        vec2 uv_nearest( vec2 uv, ivec2 texture_size ) {
+            vec2 pixel = uv * texture_size;
+            pixel = floor(pixel) + .5;
+
+            return pixel / texture_size;
+        }
+
+        // From the comments in https://www.shadertoy.com/view/MllBWf
+        vec2 uv_iq( vec2 uv, ivec2 texture_size ) {
+            vec2 pixel = uv * texture_size;
+
+            const vec2 seam = floor(pixel + 0.5);
+            const vec2 dudv = fwidth(pixel);
+            pixel = seam + clamp( (pixel - seam) / dudv, -0.5, 0.5);
+            
+            return pixel / texture_size;
+        }
+
+		void main() {
+
+            ivec2 texture_size = textureSize(albedo, 0);
+            vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
+
+            vec4 color = texture( albedo, final_uv.xy );
+            if (color.a < 0.01)
+                discard;
+
+			out_color = vec4(color.rgb, 1);
+        }
+
+        #endif // FRAGMENT
+	}
+
+    pass fat_sprite {
+        resources = Local
+        vertex = main_forward
+        fragment = main_forward
+        render_states = sprite
+        vertex_layout = sprite_instance
+    }
+}
