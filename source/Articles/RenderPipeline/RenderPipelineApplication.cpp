@@ -6,7 +6,7 @@
 #include "tiny_gltf.h"
 
 #include "RenderPipelineApplication.h"
-#include "ShaderCodeGenerator.h"
+#include "hydra/ShaderCodeGenerator.h"
 //#include "MaterialSystem.h"
 
 #include "hydra/hydra_resources.h"

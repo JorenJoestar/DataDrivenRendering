@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "Lexer.h"
+#include "hydra/Lexer.h"
 
 #include "hydra/hydra_graphics.h"
 

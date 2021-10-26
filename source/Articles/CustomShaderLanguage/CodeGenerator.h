@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Lexer.h"
+#include "hydra/Lexer.h"
 
 typedef hydra::StringRef StringRef;
 typedef hydra::StringBuffer StringBuffer;

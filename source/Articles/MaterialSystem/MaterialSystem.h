@@ -6,7 +6,7 @@
 #include "hydra/hydra_rendering.h"
 #include "hydra/hydra_resources.h"
 
-#include "ShaderCodeGenerator.h"
+#include "hydra/ShaderCodeGenerator.h"
 
 class TextEditor;
 struct MemoryEditor;
