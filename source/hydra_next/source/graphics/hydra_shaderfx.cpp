@@ -1,4 +1,4 @@
-// Hydra HFX v0.49
+// Hydra HFX v0.50
 
 #include "hydra_shaderfx.h"
 
@@ -629,6 +629,9 @@ void vertex_attribute_identifier( Parser* parser, Token& token, hydra::gfx::Vert
                 else if ( lexer_expect_keyword( token.text, 7, "ubyte4n" ) ) {
                     attribute.format = hydra::gfx::VertexComponentFormat::UByte4N;
                 }
+                else if ( lexer_expect_keyword( token.text, 4, "uint" ) ) {
+                    attribute.format = hydra::gfx::VertexComponentFormat::Uint;
+                }
 
                 break;
             }
@@ -656,8 +659,15 @@ void vertex_attribute_identifier( Parser* parser, Token& token, hydra::gfx::Vert
                 if ( lexer_expect_keyword( token.text, 4, "mat4" ) ) {
                     attribute.format = hydra::gfx::VertexComponentFormat::Mat4;
                 }
+
+                break;
             }
 
+            default:
+            {
+                //hprint( "Unsupported format %s\n", token.text );
+                break;
+            }
         }
     }
 
@@ -1608,8 +1618,7 @@ void code_generator_init( CodeGenerator* code_generator, const Parser* parser, u
     }
 
     code_generator->name_to_type.init( parser->allocator, 16 );
-    // TODO: map    
-    //string_hash_init_arena( code_generator->name_to_type );
+    code_generator->path_buffer.init( 512 * 10, parser->allocator );
 }
 
 void code_generator_terminate( CodeGenerator* code_generator ) {
@@ -1618,8 +1627,7 @@ void code_generator_terminate( CodeGenerator* code_generator ) {
     }
 
     code_generator->name_to_type.shutdown();
-    // TODO: map
-    //string_hash_free( code_generator->name_to_type );
+    code_generator->path_buffer.shutdown();
 }
 
 //
@@ -1753,7 +1761,7 @@ static void reflection_update_automatic_binding( hfx::ResourceBinding* out_bindi
 //
 //
 static void append_reflection_data( nlohmann::json& parsed_json, const char* namespace_name, StringBuffer* reflection_buffer,
-                                    hydra::FlatHashMap<u64 , cstring> name_to_type, StringBuffer& buffer, hfx::ResourceBinding* out_bindings,
+                                    hydra::FlatHashMap<u64, cstring> name_to_type, StringBuffer& buffer, hfx::ResourceBinding* out_bindings,
                                     hydra::Allocator* allocator ) {
     
     
@@ -2637,6 +2645,7 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
 
     const bool generate_reflection_data = ( ( compile_options & CompileOptions_Reflection_CPP ) == CompileOptions_Reflection_CPP ) ||
                                           ( ( compile_options & CompileOptions_Reflection_Reload ) == CompileOptions_Reflection_Reload );
+    code_generator->generate_reflection_data = generate_reflection_data;
 
     char* reflection_filename = nullptr;
 
@@ -2761,48 +2770,60 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
         // Optionally if properties are present but no layout is specified for them, add the final resource layout.        
         if ( automatic_layout ) {
             ResourceList automatic_resource_list;
+
+            char* pass_name_C = filename_buffer.append_use( pass.name );
+
+            reflection_buffer.append_f("\tnamespace %s {\n", pass_name_C );
+
             for ( u32 rb = 0; rb < 32; ++rb ) {
                 if ( pass_bindings[ rb ].count != 0 ) {
-                    automatic_resource_list.resources.push_back( pass_bindings[ rb ] );
+                    hfx::ResourceBinding& binding = pass_bindings[ rb ];
+                    automatic_resource_list.resources.push_back( binding );
+
+                    // Save the layout binding into the reflection buffer
+                    reflection_buffer.append_f( "\t\tstatic const uint32_t layout_%s = %u;\n", binding.name, (u32)automatic_resource_list.resources.size() - 1);
                 }
             }
+
+            reflection_buffer.append_f("\t}\n");
 
             ResourceLayoutBlueprint& resource_layout_blueprint = pass_blueprint.resource_layouts[ num_layouts ];
             blob.allocate_and_set<ResourceBinding>( resource_layout_blueprint.bindings, (u32)automatic_resource_list.resources.size(), ( void* )automatic_resource_list.resources.data() );
         }
     }
 
-    // Output to HFX file
-    filename_buffer.clear();
-    char* output_name = filename_buffer.append_use_f( "%s", output_filename );
-    hydra::file_write_binary( output_name, blob.blob_memory, blob.allocated_offset );
+    // Output to HFX and generated c++ file if compilation is good
+    if ( compilation_succeeded ) {
+        filename_buffer.clear();
+        char* output_name = filename_buffer.append_use_f( "%s", output_filename );
+        hydra::file_write_binary( output_name, blob.blob_memory, blob.allocated_offset );
 
-    if ( generate_reflection_data ) {
-        if ( !hydra::directory_exists( "..//source//generated//" ) ) {
-            hprint( "Directory %s does not exists! Creating it.\n", "..//source//generated//" );
+        if ( generate_reflection_data ) {
+            if ( !hydra::directory_exists( code_generator->cpp_generated_folder ) ) {
+                hprint( "Directory %s does not exists! Creating it.\n", code_generator->cpp_generated_folder );
 
-            if ( !hydra::directory_create( "..//source//generated//" ) ) {
-                hprint( "Error creating directory %s! Cannot output generated shader generated file. Quitting.\n", "..//source//generated//" );
-                return;
+                if ( !hydra::directory_create( code_generator->cpp_generated_folder ) ) {
+                    hprint( "Error creating directory %s! Cannot output generated shader generated file. Quitting.\n", code_generator->cpp_generated_folder );
+                    return;
+                }
+            }
+
+            char* generated_output_name = filename_buffer.reserve( 512 );
+            strcpy( generated_output_name, output_filename );
+            hydra::file_name_from_path( generated_output_name );
+
+            const char* filename_string = filename_buffer.append_use_f( "%s//%s.h", code_generator->cpp_generated_folder, generated_output_name );
+            FILE* reflection_file = fopen( filename_string, "w+" );
+            if ( reflection_file ) {
+                reflection_buffer.append( "} //\n" );
+
+                fwrite( reflection_buffer.data, reflection_buffer.current_size, 1, reflection_file );
+                fclose( reflection_file );
+            } else {
+                hprint( "Could not create file generated shader file %s.\n", filename_string );
             }
         }
-
-        char* generated_output_name = filename_buffer.reserve( 512 );
-        strcpy( generated_output_name, output_filename );
-        hydra::file_name_from_path( generated_output_name );
-
-        const char* filename_string = filename_buffer.append_use_f( "..//source//generated//%s.h", generated_output_name );
-        FILE* reflection_file = fopen( filename_string, "w+" );
-        if ( reflection_file ) {
-            reflection_buffer.append( "} //\n" );
-
-            fwrite( reflection_buffer.data, reflection_buffer.current_size, 1, reflection_file );
-            fclose( reflection_file );
-        }
-        else {
-            hprint( "Could not create file generated shader file %s.\n", filename_string );
-        }
-    }
+    }    
 
     blob.shutdown();
 
@@ -3245,7 +3266,7 @@ static const size_t                 k_hfx_random_seed = 0xfeba666ddea21a46;
 
 //
 //
-bool hfx_compile( const char* input_filename, const char* output_filename, u32 options, bool force_rebuild ) {
+bool hfx_compile( const char* input_filename, const char* output_filename, u32 options, cstring cpp_generated_folder, bool force_rebuild ) {
 
     hydra::MallocAllocator heap_allocator;
 
@@ -3265,7 +3286,7 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
     hydra::FileTime file_time = hydra::file_last_write_time( input_filename );
 
     // Check if the binary was generated from the same file.
-    // If so don't compile.
+    // If so do not compile.
     if ( !force_rebuild && hydra::file_exists( output_filename ) ) {
 
 #if defined HFX_V2
@@ -3304,13 +3325,6 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
 
         if ( file_time.dwHighDateTime == saved_filetime.dwHighDateTime &&
              file_time.dwLowDateTime == saved_filetime.dwLowDateTime ) {
-
-            // Open the file if needed
-            // TODO memory: this was causing a memory leak.
-            /*if ( out_shader_effect_file ) {
-                char* hfx_memory = hydra::file_read_binary( output_filename, heap_allocator, nullptr );
-                shader_effect_init( *out_shader_effect_file, hfx_memory );
-            }*/
 
             hfree( text, &heap_allocator );
             // TODO memory (not anymore) Allocator still has allocations from hfx_memory.
@@ -3366,9 +3380,16 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
     // if (options ...)
     char* vulkan_env = filename_buffer.reserve( 512 );
     hydra::environment_variable_get( "%VULKAN_SDK%", vulkan_env, 512 );
-    char* compiler_path = filename_buffer.append_use_f( "%s\\Bin\\", vulkan_env );
 
-    strcpy( code_generator.shader_binaries_path, compiler_path );
+    // Cache paths
+    code_generator.path_buffer.clear();
+    code_generator.shader_binaries_path = code_generator.path_buffer.append_use_f( "%s\\Bin\\", vulkan_env );
+    code_generator.cpp_generated_folder = cpp_generated_folder;
+    code_generator.source_folder_path = code_generator.path_buffer.append_use_f( "%s", input_path );
+    code_generator.destination_folder_path = code_generator.path_buffer.append_use_f( "%s", output_path );
+
+    // Clear buffer to be used inside compilation.
+    filename_buffer.clear();
 
     // Cache options
     code_generator.options = options;
@@ -3377,9 +3398,6 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
     if ( (code_generator.options & CompileOptions_Vulkan) == CompileOptions_Vulkan ) {
         code_generator.options |= CompileOptions_SpirV;
     }
-
-    // Clear buffer to be used inside compilation.
-    filename_buffer.clear();
 
     if ( (options & CompileOptions_Embedded) == CompileOptions_Embedded ) {
         //hfx::code_generator_generate_embedded_file( &code_generator, output_filename );

@@ -139,7 +139,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui;..\..\source\Articles\GpuDrivenText</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

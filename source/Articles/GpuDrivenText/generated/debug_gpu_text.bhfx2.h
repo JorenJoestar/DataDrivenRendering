@@ -57,6 +57,12 @@ namespace gpu_text {
 
 	} // namespace fullscreen_frag
 
+	namespace fullscreen {
+		static const uint32_t layout_DebugGpuFontBuffer = 0;
+		static const uint32_t layout_DebugGpuFontEntries = 1;
+		static const uint32_t layout_DebugGPUFontDispatch = 2;
+		static const uint32_t layout_DebugGPUIndirect = 3;
+	}
 
 	static const uint32_t		pass_calculate_dispatch = 1;
 
@@ -103,6 +109,12 @@ namespace gpu_text {
 
 	} // namespace calculate_dispatch_comp
 
+	namespace calculate_dispatch {
+		static const uint32_t layout_DebugGpuFontBuffer = 0;
+		static const uint32_t layout_DebugGpuFontEntries = 1;
+		static const uint32_t layout_DebugGPUFontDispatch = 2;
+		static const uint32_t layout_DebugGPUIndirect = 3;
+	}
 
 	static const uint32_t		pass_sprite = 2;
 
@@ -219,6 +231,13 @@ namespace gpu_text {
 
 	} // namespace sprite_frag
 
+	namespace sprite {
+		static const uint32_t layout_Local = 0;
+		static const uint32_t layout_DebugGpuFontBuffer = 1;
+		static const uint32_t layout_DebugGpuFontEntries = 2;
+		static const uint32_t layout_DebugGPUFontDispatch = 3;
+		static const uint32_t layout_DebugGPUIndirect = 4;
+	}
 
 	static const uint32_t		pass_through = 3;
 
@@ -240,4 +259,7 @@ namespace gpu_text {
 
 	} // namespace through_frag
 
+	namespace through {
+		static const uint32_t layout_albedo = 0;
+	}
 } //

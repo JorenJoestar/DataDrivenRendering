@@ -30,6 +30,8 @@ namespace hydra {
         void            register_os_messages_callback( OsMessagesCallback callback, void* user_data );
         void            unregister_os_messages_callback( OsMessagesCallback callback );
 
+        void            center_mouse( bool dragging );
+
         Array<OsMessagesCallback> os_messages_callbacks;
         Array<void*>    os_messages_callbacks_data;
 

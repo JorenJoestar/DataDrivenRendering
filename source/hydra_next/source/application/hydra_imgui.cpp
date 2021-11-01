@@ -1,4 +1,4 @@
-// Hydra ImGUI - v0.11
+// Hydra ImGUI - v0.13
 
 #include "hydra_imgui.hpp"
 
@@ -81,9 +81,25 @@ static const char*                  g_fragment_shader_code = {
     "layout (location = 1) in vec4 Frag_Color;\n"
     "layout (location = 0) out vec4 Out_Color;\n"
     "layout (binding = 1) uniform sampler2D Texture;\n"
+    //"#extension GL_EXT_nonuniform_qualifier : enable\n"
+    //"layout (binding = 10) uniform sampler2D textures[];\n"
     "void main()\n"
     "{\n"
     "    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);\n"
+    "}\n"
+};
+
+static const char*                  g_fragment_shader_code_bindless = {
+    "#version 450\n"
+    "#extension GL_EXT_nonuniform_qualifier : enable\n"
+    "layout (location = 0) in vec2 Frag_UV;\n"
+    "layout (location = 1) in vec4 Frag_Color;\n"
+    "layout (location = 0) out vec4 Out_Color;\n"
+    "#extension GL_EXT_nonuniform_qualifier : enable\n"
+    "layout (binding = 10) uniform sampler2D textures[];\n"
+    "void main()\n"
+    "{\n"
+    "    Out_Color = Frag_Color * texture(textures[2], Frag_UV.st);\n"
     "}\n"
 };
 
@@ -176,7 +192,7 @@ void ImGuiService::init( void* configuration ) {
 
     ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = "Hydra_ImGui";
-
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
     using namespace hydra::gfx;
 
     // Load font texture atlas //////////////////////////////////////////////////
@@ -228,15 +244,21 @@ void ImGuiService::init( void* configuration ) {
     ShaderStateCreation shader_creation{};
 
 #if defined(HYDRA_OPENGL)
+
     shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code, (uint32_t)strlen( g_vertex_shader_code ), ShaderStage::Vertex )
         .add_stage( g_fragment_shader_code, (uint32_t)strlen( g_fragment_shader_code ), ShaderStage::Fragment );
-#elif defined(HYDRA_VULKAN)
-    /*shader_creation.set_name( "ImGui" ).add_stage( (const char*)s_vertex_spv, ArrayLength(s_vertex_spv) * sizeof(uint32_t), ShaderStage::Vertex )
-                                       .add_stage( (const char*)s_fragment_spv, ArrayLength(s_fragment_spv) * sizeof( uint32_t), ShaderStage::Fragment )
-                                       .set_spv_input( true );*/
 
-    shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code_vulkan, (uint32_t)strlen( g_vertex_shader_code_vulkan ), ShaderStage::Vertex )
-        .add_stage( g_fragment_shader_code, (uint32_t)strlen( g_fragment_shader_code ), ShaderStage::Fragment );
+#elif defined(HYDRA_VULKAN)
+
+    if ( gpu->bindless_supported ) {
+        shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code_vulkan, ( uint32_t )strlen( g_vertex_shader_code_vulkan ), ShaderStage::Vertex )
+            .add_stage( g_fragment_shader_code_bindless, ( uint32_t )strlen( g_fragment_shader_code_bindless ), ShaderStage::Fragment );
+    }
+    else {
+        shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code_vulkan, ( uint32_t )strlen( g_vertex_shader_code_vulkan ), ShaderStage::Vertex )
+            .add_stage( g_fragment_shader_code, ( uint32_t )strlen( g_fragment_shader_code ), ShaderStage::Fragment );
+    }
+    
 #endif // HYDRA_OPENGL
 
 
@@ -254,7 +276,14 @@ void ImGuiService::init( void* configuration ) {
     pipeline_creation.render_pass = gpu->get_swapchain_output();
 
     ResourceLayoutCreation resource_layout_creation{};
-    resource_layout_creation.add_binding( { ResourceType::Constants, 0, 1, "LocalConstants" } ).add_binding( { ResourceType::Texture, 1, 1, "Texture" } ).set_name( "RLL_ImGui" );
+    // bindless
+    if ( gpu->bindless_supported ) {
+        resource_layout_creation.add_binding( { ResourceType::Constants, 0, 1, "LocalConstants" } ).add_binding( { ResourceType::Texture, 10, 1, "Texture" } ).set_name( "RLL_ImGui" );
+    }
+    else {
+        resource_layout_creation.add_binding( { ResourceType::Constants, 0, 1, "LocalConstants" } ).add_binding( { ResourceType::Texture, 1, 1, "Texture" } ).set_name( "RLL_ImGui" );
+    }
+    
     g_resource_layout = gpu->create_resource_layout( resource_layout_creation );
 #endif // HYDRA_IMGUI_HFX
 
@@ -487,14 +516,12 @@ void ImGuiService::render( hydra::gfx::Renderer* renderer, hydra::gfx::CommandBu
                         commands.bind_resource_list( sort_key++, &last_resource_list, 1, nullptr, 0 );
                     }
 
-                    //const uint32_t start_index_offset = index_buffer_offset;// *sizeof( ImDrawIdx );
-                    //const uint32_t end_index_offset = start_index_offset + pcmd->ElemCount * sizeof( ImDrawIdx );
-                    commands.draw_indexed( sort_key++, hydra::gfx::TopologyType::Triangle, pcmd->ElemCount, 1, index_buffer_offset, vtx_buffer_offset, 0 );
+                    commands.draw_indexed( sort_key++, hydra::gfx::TopologyType::Triangle, pcmd->ElemCount, 1, index_buffer_offset + pcmd->IdxOffset, vtx_buffer_offset + pcmd->VtxOffset, 0 );
                 }
             }
-            index_buffer_offset += pcmd->ElemCount;
+            
         }
-
+        index_buffer_offset += cmd_list->IdxBuffer.Size;
         vtx_buffer_offset += cmd_list->VtxBuffer.Size;
     }
 

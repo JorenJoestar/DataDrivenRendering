@@ -29,6 +29,8 @@ struct SpriteGPUData {
     f32                             screen_space_flag;      // True if position is screen space.
     f32                             lighting_flag;          // True if lighting is on.
 
+    u32                             albedo_id;              // Global albedo id
+
 }; // struct SpriteGPUData
 
 //

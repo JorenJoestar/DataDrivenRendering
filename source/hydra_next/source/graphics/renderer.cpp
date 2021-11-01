@@ -770,6 +770,9 @@ void GPUProfiler::init( Allocator* allocator_, u32 max_frames_ ) {
     per_frame_active = ( u16* )halloca( sizeof( u16 )* max_frames, allocator );
 
     max_duration = 16.666f;
+    current_frame = 0;
+    min_time = max_time = average_time = 0.f;
+    paused = false;
 
     memset( per_frame_active, 0, 2 * max_frames );
 
@@ -827,6 +830,9 @@ void GPUProfiler::update( Device& gpu ) {
 }
 
 void GPUProfiler::draw_ui() {
+    if ( initial_frames_paused ) {
+        return;
+    }
 
     {
         ImDrawList* draw_list = ImGui::GetWindowDrawList();

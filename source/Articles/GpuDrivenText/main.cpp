@@ -20,9 +20,8 @@
 
 #define uint uint32_t
 #define uvec4 vec4
-#include "generated/debug_rendering.bhfx.h"
-#include "generated/pixel_art.bhfx.h"
-#include "generated/debug_gpu_text.bhfx.h"
+#include "generated/pixel_art.bhfx2.h"
+#include "generated/debug_gpu_text.bhfx2.h"
 
 // Compiler ///////////////////////////////////////////////////////////////
 static void compile_resources( cstring root, bool force_compilation ) {
@@ -33,8 +32,8 @@ static void compile_resources( cstring root, bool force_compilation ) {
 
     hprint( "Executing from path %s\n", directory.path );
 
-    hfx::hfx_compile( "..//data//articles//GpuDrivenText//pixel_art.hfx", "..//bin//data//pixel_art.bhfx2", hfx::CompileOptions_VulkanStandard, force_compilation );
-    hfx::hfx_compile( "..//data//articles//GpuDrivenText//debug_gpu_text.hfx", "..//bin//data//debug_gpu_text.bhfx2", hfx::CompileOptions_VulkanStandard, force_compilation );
+    hfx::hfx_compile( "..//data//articles//GpuDrivenText//pixel_art.hfx", "..//bin//data//pixel_art.bhfx2", hfx::CompileOptions_VulkanStandard, "..//source//Articles//GpuDrivenText//generated", force_compilation);
+    hfx::hfx_compile( "..//data//articles//GpuDrivenText//debug_gpu_text.hfx", "..//bin//data//debug_gpu_text.bhfx2", hfx::CompileOptions_VulkanStandard, "..//source//Articles//GpuDrivenText//generated", force_compilation );
 }
 
 // GameApplication ////////////////////////////////////////////////////////
@@ -132,22 +131,22 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
 
         ResourceListCreation rlc[4];
         rlc[ gpu_text::pass_fullscreen ].reset()
-                   .buffer( debug_gpu_font_ub->handle, gpu_text::fullscreen_frag::binding_sb_DebugGpuFontBuffer )
-                   .buffer( debug_gpu_font_entries_ub->handle, gpu_text::fullscreen_frag::binding_sb_DebugGpuFontEntries );
+                   .buffer( debug_gpu_font_ub->handle, gpu_text::fullscreen::layout_DebugGpuFontBuffer )
+                   .buffer( debug_gpu_font_entries_ub->handle, gpu_text::fullscreen::layout_DebugGpuFontEntries );
 
         rlc[ gpu_text::pass_calculate_dispatch ].reset()
-            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::calculate_dispatch_comp::binding_sb_DebugGpuFontEntries )
-            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::calculate_dispatch_comp::binding_sb_DebugGPUFontDispatch )
-            .buffer( debug_gpu_font_ub->handle, gpu_text::calculate_dispatch_comp::binding_sb_DebugGpuFontBuffer )
-            .buffer( debug_gpu_font_indirect_buffer->handle, gpu_text::calculate_dispatch_comp::binding_sb_DebugGPUIndirect );
+            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::calculate_dispatch::layout_DebugGpuFontEntries )
+            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::calculate_dispatch::layout_DebugGPUFontDispatch )
+            .buffer( debug_gpu_font_ub->handle, gpu_text::calculate_dispatch::layout_DebugGpuFontBuffer )
+            .buffer( debug_gpu_font_indirect_buffer->handle, gpu_text::calculate_dispatch::layout_DebugGPUIndirect );
 
         rlc[ gpu_text::pass_sprite ].reset()
-            .buffer( pixel_art_local_constants_cb->handle, gpu_text::sprite_vert::binding_cb_Local )
-            .buffer( debug_gpu_font_ub->handle, gpu_text::sprite_vert::binding_sb_DebugGpuFontBuffer )
-            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::sprite_vert::binding_sb_DebugGpuFontEntries )
-            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::sprite_vert::binding_sb_DebugGPUFontDispatch );
+            .buffer( pixel_art_local_constants_cb->handle, gpu_text::sprite::layout_Local )
+            .buffer( debug_gpu_font_ub->handle, gpu_text::sprite::layout_DebugGpuFontBuffer )
+            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::sprite::layout_DebugGpuFontEntries )
+            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::sprite::layout_DebugGPUFontDispatch );
         rlc[ gpu_text::pass_through ].reset()
-            .texture( main_texture->handle, 1 );
+            .texture( main_texture->handle, gpu_text::through::layout_albedo );
 
         debug_gpu_font_material = gfx->create_material( debug_gpu_font_shader, rlc, 4 );
     }
@@ -159,10 +158,10 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
         nightmare_sprite_texture = gfx->create_texture( "..//data//articles//GpuDrivenText//nightmare-galloping.png" );
 
         ResourceListCreation rlc;
-        rlc.reset().buffer( pixel_art_local_constants_cb->handle, pixel_art::fat_sprite_frag::binding_cb_Local )
-                   .texture( nightmare_sprite_texture->handle, pixel_art::fat_sprite_frag::binding_tex_albedo )
-                   .buffer( debug_gpu_font_ub->handle, pixel_art::fat_sprite_vert::binding_sb_DebugGpuFontBuffer )
-                   .buffer( debug_gpu_font_entries_ub->handle, pixel_art::fat_sprite_vert::binding_sb_DebugGpuFontEntries );
+        rlc.reset().buffer( pixel_art_local_constants_cb->handle, pixel_art::fat_sprite::layout_Local )
+                   .texture( nightmare_sprite_texture->handle, pixel_art::fat_sprite::layout_albedo )
+                   .buffer( debug_gpu_font_ub->handle, pixel_art::fat_sprite::layout_DebugGpuFontBuffer )
+                   .buffer( debug_gpu_font_entries_ub->handle, pixel_art::fat_sprite::layout_DebugGpuFontEntries );
 
         nightmare_sprite_material = gfx->create_material( pixel_art_shader, &rlc, 1 );
 

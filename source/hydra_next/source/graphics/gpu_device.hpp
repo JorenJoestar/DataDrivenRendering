@@ -44,6 +44,7 @@ struct GPUTimestampManager {
     void                            init( Allocator* allocator, u16 queries_per_frame, u16 max_frames );
     void                            shutdown();
 
+    bool                            has_valid_queries() const;
     void                            reset();
     u32                             resolve( u32 current_frame, GPUTimestamp* timestamps_to_fill );    // Returns the total queries for this frame.
 

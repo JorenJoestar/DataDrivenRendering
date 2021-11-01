@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// Hydra ImGUI - v0.11
+// Hydra ImGUI - v0.13
 //
 // ImGUI wrapper using Hydra Graphics.
 //
@@ -9,6 +9,8 @@
 //
 //      Created         : 2019/09/16, 19.23
 //
+//      0.13 (2021/10/28): + Added initial support for bindless rendering.
+//      0.12 (2021/10/27): + Added support for Vertex and Index offsets in ImGui rendering.
 //      0.11 (2021/10/21): + Changed ImGuiService to use Renderer instead of GpuDevice.
 //      0.10 (2020/01/21): + Added resize method. Internally destroys resource lists provoking a rebind the frame after.
 //      0.09 (2020/12/28): + Fixed scissor clipping.

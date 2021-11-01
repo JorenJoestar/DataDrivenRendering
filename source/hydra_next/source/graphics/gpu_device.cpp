@@ -158,6 +158,11 @@ void GPUTimestampManager::reset() {
     depth = 0;
 }
 
+bool GPUTimestampManager::has_valid_queries() const {
+    // Even number of queries means asymettrical queries, thus we don't sample.
+    return current_query > 0 && ((current_query % 2) == 0);
+}
+
 u32 GPUTimestampManager::resolve( u32 current_frame, GPUTimestamp* timestamps_to_fill ) {
     hydra::memory_copy( timestamps_to_fill, &timestamps[ current_frame * queries_per_frame ], sizeof( GPUTimestamp ) * current_query );
     return current_query;

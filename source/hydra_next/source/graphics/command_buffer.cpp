@@ -52,7 +52,8 @@ void CommandBuffer::bind_pass( uint64_t sort_key, RenderPassHandle handle_ ) {
             render_pass_begin.renderArea.offset = { 0, 0 };
             render_pass_begin.renderArea.extent = { render_pass->width, render_pass->height };
 
-            render_pass_begin.clearValueCount = 2;
+            // TODO: this breaks.
+            render_pass_begin.clearValueCount = 2;// render_pass->output.color_operation ? 2 : 0;
             render_pass_begin.pClearValues = clears;
 
             vkCmdBeginRenderPass( vk_command_buffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE );

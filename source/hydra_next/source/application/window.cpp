@@ -213,4 +213,13 @@ void Window::unregister_os_messages_callback( OsMessagesCallback callback ) {
     }
 }
 
+void Window::center_mouse( bool dragging ) {
+    if ( dragging ) {
+        SDL_WarpMouseInWindow( window, width / 2, height / 2 );
+        SDL_SetWindowGrab( window, SDL_TRUE );
+    } else {
+        SDL_SetWindowGrab( window, SDL_FALSE );
+    }
+}
+
 } // namespace hydra

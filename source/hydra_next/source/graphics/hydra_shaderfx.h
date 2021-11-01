@@ -1,6 +1,6 @@
 
 //
-// Hydra HFX v0.49
+// Hydra HFX v0.50
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
@@ -9,6 +9,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.50  (2021/10/27): + Added generated c++ folder as hfx_compile parameter to control generated file output.
 //      0.49  (2021/10/25): + Fixed a reflection duplication bug coming from the generated json.
 //      0.48  (2021/10/24): + Added support for Structured Buffers in layouts. + Added support for automatic layout from reflection data.
 //      0.47  (2021/10/23): + Added textures and ubos indices in reflection generated c++ header.
@@ -323,7 +324,7 @@ namespace hfx {
     //
     // Main compile function. Input_filename is the hfx input file, output_filename can be either a file or a folder, options dictate the behaviour.
     // Optionally specify an output shader effect file.
-    bool                            hfx_compile( const char* input_filename, const char* output_filename, u32 options, bool force_rebuild = false );
+    bool                            hfx_compile( const char* input_filename, const char* output_filename, u32 options, cstring cpp_generated_folder, bool force_rebuild = false );
 
     void                            hfx_inspect( const char* binary_filename );
     void                            hfx_inspect_imgui( ShaderEffectFile& bhfx_file );
@@ -540,16 +541,25 @@ namespace hfx {
     struct CodeGenerator {
 
         const Parser*               parser          = nullptr;
-        uint32_t                    buffer_count    = 0;
+
+        u32                         buffer_count    = 0;
 
         StringBuffer*               string_buffers  = nullptr;
         hydra::FlatHashMap<u64, cstring> name_to_type;
 
-        char                        shader_binaries_path[512];      // Path of the shader compiler used, if needed.
+        StringBuffer                path_buffer;                    // String buffer used to cache all globally needed paths.
+
+        cstring                     source_folder_path;
+        cstring                     destination_folder_path;
+        cstring                     shader_binaries_path;           // Path of the shader compiler used, if needed.
+        cstring                     cpp_generated_folder;
 
         char                        binary_header_magic[32];        // Memory used in individual headers when generating binary files.
 
-        uint32_t                    options;                        // CompileOption flags cache.
+        u32                         options;                        // CompileOption flags cache.
+
+        // Additional options
+        u8                          generate_reflection_data;
     }; // struct CodeGenerator
 
     void                            code_generator_init( CodeGenerator* code_generator, const Parser* parser, uint32_t buffer_size, uint32_t buffer_count );

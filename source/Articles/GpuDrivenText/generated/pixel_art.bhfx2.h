@@ -78,4 +78,12 @@ namespace pixel_art {
 
 	} // namespace fat_sprite_frag
 
+	namespace fat_sprite {
+		static const uint32_t layout_Local = 0;
+		static const uint32_t layout_albedo = 1;
+		static const uint32_t layout_DebugGpuFontBuffer = 2;
+		static const uint32_t layout_DebugGpuFontEntries = 3;
+		static const uint32_t layout_DebugGPUFontDispatch = 4;
+		static const uint32_t layout_DebugGPUIndirect = 5;
+	}
 } //

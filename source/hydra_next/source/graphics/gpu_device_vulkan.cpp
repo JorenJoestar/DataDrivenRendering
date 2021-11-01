@@ -4,6 +4,7 @@
 #include "kernel/file.hpp"
 #include "kernel/process.hpp"
 #include "kernel/hash_map.hpp"
+#include "kernel/log.hpp"
 
 #if defined(HYDRA_VULKAN)
 
@@ -403,6 +404,12 @@ void Device::pop_gpu_timestamp( CommandBuffer* command_buffer ) {
 
 static CommandBufferRing command_buffer_ring;
 
+//#define HYDRA_BINDLESS
+
+// gsBindless
+static const u32        k_bindless_texture_binding = 10;
+static const u32        k_max_bindless_resources = 32;
+
 void GpuDeviceVulkan::internal_init( const DeviceCreation& creation ) {
 
     //////// Init Vulkan instance.
@@ -553,7 +560,7 @@ void GpuDeviceVulkan::internal_init( const DeviceCreation& creation ) {
         indexing_features.descriptorBindingPartiallyBound = VK_TRUE;
         indexing_features.runtimeDescriptorArray = VK_TRUE;
 
-        device_create_info.pNext = &indexing_features;
+        physical_features2.pNext = &indexing_features;
     }
 #endif // HYDRA_BINDLESS
 
@@ -642,25 +649,26 @@ void GpuDeviceVulkan::internal_init( const DeviceCreation& creation ) {
     check( result );
 
     ////////  Create pools
+    static const u32 k_global_pool_elements = 128;
     VkDescriptorPoolSize pool_sizes[] =
     {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+        { VK_DESCRIPTOR_TYPE_SAMPLER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, k_global_pool_elements}
     };
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * ArraySize( pool_sizes );
-    pool_info.poolSizeCount = ( uint32_t )ArraySize( pool_sizes );
+    pool_info.maxSets = k_global_pool_elements * ArraySize( pool_sizes );
+    pool_info.poolSizeCount = ( u32 )ArraySize( pool_sizes );
     pool_info.pPoolSizes = pool_sizes;
     result = vkCreateDescriptorPool( vulkan_device, &pool_info, vulkan_allocation_callbacks, &vulkan_descriptor_pool );
     check( result );
@@ -1586,6 +1594,8 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
     resource_layout->vk_binding = ( VkDescriptorSetLayoutBinding* )halloca( sizeof( VkDescriptorSetLayoutBinding ) * creation.num_bindings, allocator );
     resource_layout->handle = handle;
 
+    bool bindless_descriptor = false;
+
     for ( uint32_t r = 0; r < creation.num_bindings; ++r ) {
         ResourceBindingVulkan& binding = resource_layout->bindings[ r ];
         const ResourceLayoutCreation::Binding& input_binding = creation.bindings[ r ];
@@ -1598,7 +1608,18 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
         vk_binding.binding = binding.start;
         vk_binding.descriptorType = to_vk_descriptor_type( input_binding.type );
 #if defined (HYDRA_BINDLESS)
-        vk_binding.descriptorCount = 12;
+        if ( binding.type == ResourceType::Texture ) {
+            // TODO: hardcoded bindless values to test functionality
+            bindless_descriptor = true;
+            vk_binding.descriptorCount = k_max_bindless_resources;
+            vk_binding.binding = k_bindless_texture_binding;
+        }
+        else {
+            vk_binding.descriptorCount = 1;
+            // TODO: still need to improve this!
+            vk_binding.descriptorType = vk_binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : vk_binding.descriptorType;
+        }
+        
 #else
         vk_binding.descriptorCount = 1;
         // TODO: default to dynamic constants
@@ -1616,12 +1637,18 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
     layout_info.pBindings = resource_layout->vk_binding;
 
 #if defined (HYDRA_BINDLESS)
-    VkDescriptorBindingFlags binding_flag[] = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT };
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr };
-    extended_info.bindingCount = creation.num_bindings;
-    extended_info.pBindingFlags = binding_flag;
+    if ( bindless_descriptor ) {
+        VkDescriptorBindingFlags binding_flag[] = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT,
+                                                     VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT };
+        VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr };
+        extended_info.bindingCount = creation.num_bindings;
+        extended_info.pBindingFlags = binding_flag;
+        // Bindless: need to have partially bound flags to be on all descriptors.
+        // Find a way to overcome this.
+        hy_assert( creation.num_bindings <= ArraySize( binding_flag ) );
 
-    layout_info.pNext = &extended_info;
+        layout_info.pNext = &extended_info;
+    }
 #endif // HYDRA_BINDLESS
 
     vkCreateDescriptorSetLayout( vulkan_device, &layout_info, vulkan_allocation_callbacks, &resource_layout->vk_descriptor_set_layout );
@@ -1638,13 +1665,19 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
     for ( u32 r = 0; r < num_resources; r++ ) {
 
         u32 i = r;
-        const ResourceBindingVulkan& binding = resource_layout->bindings[ i ];
+        // Binding array contains the index into the resource layout binding to retrieve
+        // the correct binding informations.
+        u32 layout_binding_index = bindings[ r ];
+
+        const ResourceBindingVulkan& binding = resource_layout->bindings[ layout_binding_index ];
 
         descriptor_write[ i ] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         descriptor_write[ i ].dstSet = vk_descriptor_set;
         // Use binding array to get final binding point.
-        descriptor_write[ i ].dstBinding = bindings[ r ];
+        const u32 binding_point = binding.start;
+        descriptor_write[ i ].dstBinding = binding_point;
         descriptor_write[ i ].dstArrayElement = 0;
+        descriptor_write[ i ].descriptorCount = 1;
 
         switch ( binding.type ) {
             case ResourceType::Texture:
@@ -1672,9 +1705,8 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
                 descriptor_write[ i ].pImageInfo = &image_info[ i ];
 
 #if defined (HYDRA_BINDLESS)
-                // gstodo: bindless
                 descriptor_write[ i ].dstArrayElement = texture_handle.index;
-#endif // HYDRA_BINDLESS
+#endif
 
                 break;
             }
@@ -1718,9 +1750,9 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
 
                 descriptor_write[ i ].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 // gsbindless
-#if !defined( HYDRA_BINDLESS )
+//#if !defined( HYDRA_BINDLESS )
                 descriptor_write[ i ].descriptorType = buffer->usage == ResourceUsageType::Dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-#endif // HYDRA_BINDLESS
+//#endif // HYDRA_BINDLESS
                 // Bind parent buffer if present, used for dynamic resources.
                 if ( buffer->parent_buffer.index != k_invalid_index ) {
                     BufferVulkan* parent_buffer = gpu.access_buffer( buffer->parent_buffer );
@@ -1745,9 +1777,9 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
 
                 descriptor_write[ i ].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 // gsbindless
-#if !defined( HYDRA_BINDLESS )
+//#if !defined( HYDRA_BINDLESS )
                 //descriptor_write[ i ].descriptorType = buffer->usage == ResourceUsageType::Dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-#endif // HYDRA_BINDLESS
+//#endif // HYDRA_BINDLESS
                 // Bind parent buffer if present, used for dynamic resources.
                 if ( buffer->parent_buffer.index != k_invalid_index ) {
                     BufferVulkan* parent_buffer = gpu.access_buffer( buffer->parent_buffer );
@@ -1771,8 +1803,6 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
                 break;
             }
         }
-
-        descriptor_write[ i ].descriptorCount = 1;
     }
 }
 
@@ -2724,7 +2754,7 @@ void GpuDeviceVulkan::present() {
     //
     // GPU Timestamp resolve
     if ( timestamps_enabled ) {
-        if ( gpu_timestamp_manager->current_query ) {
+        if ( gpu_timestamp_manager->has_valid_queries() ) {
         // Query GPU for all timestamps.
             const u32 query_offset = ( current_frame * gpu_timestamp_manager->queries_per_frame ) * 2;
             const u32 query_count = gpu_timestamp_manager->current_query * 2;
@@ -2749,6 +2779,9 @@ void GpuDeviceVulkan::present() {
                 //print_format( "%s: %2.3f d(%u) - ", timestamp.name, elapsed_time, timestamp.depth );
             }
             //print_format( "\n" );
+        }
+        else if ( gpu_timestamp_manager->current_query ) {
+            hprint( "Asymmetrical GPU queries, missing pop of some markers!\n" );
         }
 
         gpu_timestamp_manager->reset();
