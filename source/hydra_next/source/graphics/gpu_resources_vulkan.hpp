@@ -158,7 +158,8 @@ struct ResourceLayoutVulkan {
 
     VkDescriptorSetLayoutBinding*   vk_binding      = nullptr;
     ResourceBindingVulkan*          bindings        = nullptr;
-    u32                             num_bindings    = 0;
+    u16                             num_bindings    = 0;
+    u16                             max_binding     = 0;
 
     ResourceLayoutHandle            handle;
 

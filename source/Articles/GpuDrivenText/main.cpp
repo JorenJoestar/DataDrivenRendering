@@ -99,7 +99,7 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
 
     using namespace hydra::gfx;
     // Create constant buffer
-    pixel_art_local_constants_cb = gfx->create_buffer( BufferType::Constant_mask, ResourceUsageType::Dynamic, sizeof( pixel_art::fat_sprite_frag::LocalConstants ), nullptr, "pixel_art_local_constants_cb" );
+    pixel_art_local_constants_cb = gfx->create_buffer( BufferType::Constant_mask, ResourceUsageType::Dynamic, sizeof( pixel_art::fat_sprite::frag::LocalConstants ), nullptr, "pixel_art_local_constants_cb" );
     debug_gpu_font_ub = gfx->create_buffer( BufferType::Structured_mask, ResourceUsageType::Dynamic, 1024 * 16, nullptr, "gpu_font_ub" );
     debug_gpu_font_entries_ub = gfx->create_buffer( BufferType::Structured_mask, ResourceUsageType::Dynamic, 1024 * 16, nullptr, "gpu_font_entries_ub" );
     debug_gpu_font_dispatches_ub = gfx->create_buffer( BufferType::Structured_mask, ResourceUsageType::Dynamic, 1024 * 16, nullptr, "gpu_font_dispatches" );
@@ -128,27 +128,16 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
     if ( debug_gpu_font_shader ) {
         using namespace hydra::gfx;
         
+        gpu_text::fullscreen::table().reset().set_DebugGpuFontEntries( debug_gpu_font_entries_ub ).set_DebugGpuFontBuffer( debug_gpu_font_ub );
+        gpu_text::calculate_dispatch::table().reset().set_DebugGpuFontBuffer( debug_gpu_font_ub ).set_DebugGPUFontDispatch( debug_gpu_font_dispatches_ub )
+            .set_DebugGpuFontEntries( debug_gpu_font_entries_ub ).set_DebugGPUIndirect( debug_gpu_font_indirect_buffer );
 
-        ResourceListCreation rlc[4];
-        rlc[ gpu_text::pass_fullscreen ].reset()
-                   .buffer( debug_gpu_font_ub->handle, gpu_text::fullscreen::layout_DebugGpuFontBuffer )
-                   .buffer( debug_gpu_font_entries_ub->handle, gpu_text::fullscreen::layout_DebugGpuFontEntries );
+        gpu_text::sprite::table().reset().set_Local( pixel_art_local_constants_cb ).set_DebugGpuFontBuffer( debug_gpu_font_ub )
+            .set_DebugGPUFontDispatch( debug_gpu_font_dispatches_ub ).set_DebugGpuFontEntries( debug_gpu_font_entries_ub );
+        
+        gpu_text::through::table().reset().set_albedo( main_texture );
 
-        rlc[ gpu_text::pass_calculate_dispatch ].reset()
-            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::calculate_dispatch::layout_DebugGpuFontEntries )
-            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::calculate_dispatch::layout_DebugGPUFontDispatch )
-            .buffer( debug_gpu_font_ub->handle, gpu_text::calculate_dispatch::layout_DebugGpuFontBuffer )
-            .buffer( debug_gpu_font_indirect_buffer->handle, gpu_text::calculate_dispatch::layout_DebugGPUIndirect );
-
-        rlc[ gpu_text::pass_sprite ].reset()
-            .buffer( pixel_art_local_constants_cb->handle, gpu_text::sprite::layout_Local )
-            .buffer( debug_gpu_font_ub->handle, gpu_text::sprite::layout_DebugGpuFontBuffer )
-            .buffer( debug_gpu_font_entries_ub->handle, gpu_text::sprite::layout_DebugGpuFontEntries )
-            .buffer( debug_gpu_font_dispatches_ub->handle, gpu_text::sprite::layout_DebugGPUFontDispatch );
-        rlc[ gpu_text::pass_through ].reset()
-            .texture( main_texture->handle, gpu_text::through::layout_albedo );
-
-        debug_gpu_font_material = gfx->create_material( debug_gpu_font_shader, rlc, 4 );
+        debug_gpu_font_material = gfx->create_material( debug_gpu_font_shader, gpu_text::tables, gpu_text::pass_count );
     }
 
     RenderPassOutput so2[] = { forward_stage->output };
@@ -157,16 +146,11 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
         // Load texture
         nightmare_sprite_texture = gfx->create_texture( "..//data//articles//GpuDrivenText//nightmare-galloping.png" );
 
-        ResourceListCreation rlc;
-        rlc.reset().buffer( pixel_art_local_constants_cb->handle, pixel_art::fat_sprite::layout_Local )
-                   .texture( nightmare_sprite_texture->handle, pixel_art::fat_sprite::layout_albedo )
-                   .buffer( debug_gpu_font_ub->handle, pixel_art::fat_sprite::layout_DebugGpuFontBuffer )
-                   .buffer( debug_gpu_font_entries_ub->handle, pixel_art::fat_sprite::layout_DebugGpuFontEntries );
+        pixel_art::fat_sprite::table().reset().set_Local( pixel_art_local_constants_cb ).
+            set_albedo( nightmare_sprite_texture ).set_DebugGpuFontBuffer( debug_gpu_font_ub )
+            .set_DebugGpuFontEntries( debug_gpu_font_entries_ub );
 
-        nightmare_sprite_material = gfx->create_material( pixel_art_shader, &rlc, 1 );
-
-
-        hprint( "\n" );
+        nightmare_sprite_material = gfx->create_material( pixel_art_shader, pixel_art::tables, pixel_art::pass_count );
     }
 
     sprite_batch.init( *gfx, allocator );
@@ -239,9 +223,10 @@ bool hg04::main_loop() {
 
         hydra::MemoryService::instance()->debug_ui();
 
+        
         main_camera.update();
 
-        pixel_art::fat_sprite_frag::LocalConstants* constants = ( pixel_art::fat_sprite_frag::LocalConstants* )gfx->map_buffer( pixel_art_local_constants_cb );
+        pixel_art::fat_sprite::frag::LocalConstants* constants = ( pixel_art::fat_sprite::frag::LocalConstants* )gfx->map_buffer( pixel_art_local_constants_cb );
         if ( constants ) {
             memcpy( constants->view_projection_matrix, main_camera.view_projection.raw, sizeof( mat4s ) );
             main_camera.get_projection_ortho_2d( constants->projection_matrix_2d );
@@ -270,6 +255,7 @@ bool hg04::main_loop() {
         sprite.lighting_flag = 1;
         sprite.size = { nightmare_sprite_texture->desc.width * 2.f, nightmare_sprite_texture->desc.height * 2.f };
         sprite.position = { 20 + sinf(timer) * 10, 20 + cosf(timer) * 10, 0, 1 };
+        sprite.albedo_id = nightmare_sprite_texture->handle.index;
 
         sprite_batch.begin( *gfx, main_camera );
         sprite_batch.set( nightmare_sprite_material->pipelines[ 0 ], nightmare_sprite_material->resource_lists[ 0 ] );

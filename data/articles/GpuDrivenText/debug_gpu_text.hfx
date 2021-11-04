@@ -1,6 +1,29 @@
 shader gpu_text {
 
 	layout {
+
+        list fullscreen {
+            sbuffer DebugGpuFontBuffer;
+            sbuffer DebugGpuFontEntries;
+        }
+
+        list calculate_dispatch {
+            sbuffer DebugGpuFontBuffer;
+            sbuffer DebugGpuFontEntries;
+            sbuffer DebugGPUFontDispatch;
+            sbuffer DebugGPUIndirect;
+        }
+
+        list main_forward {
+            cbuffer Local;
+            sbuffer DebugGpuFontBuffer;
+            sbuffer DebugGpuFontEntries;
+            sbuffer DebugGPUFontDispatch;
+        }
+
+        list through {
+            texture2D albedo;
+        }
         
         vertex sprite_instance {
             binding 0 16 instance
@@ -266,11 +289,17 @@ shader gpu_text {
 
         layout (location = 0) out vec4 out_color;
 
+#if !defined(HYDRA_BINDLESS)
         layout (binding = 1) uniform sampler2D albedo;
+#endif // !HYDRA_BINDLESS
 
 		void main() {
 
+#if defined(HYDRA_BINDLESS)
+            vec4 color = texture( textures[3], vTexCoord.xy );
+#else
             vec4 color = texture( albedo, vTexCoord.xy );
+#endif // HYDRA_BINDLESS
             if (color.a < 0.01)
                 discard;
 
@@ -281,24 +310,27 @@ shader gpu_text {
 	}
 
     pass fullscreen {
-        resources = local
+        resources = fullscreen
         vertex = fullscreen
         fragment = fullscreen
         render_states = fullscreen
     }
 
     pass calculate_dispatch {
+        resources = calculate_dispatch
     	compute = calculate_dispatch
     	dispatch = 1, 1, 1
     }
 
     pass sprite {
+        resources = main_forward
         vertex = main_forward
         fragment = main_forward
         render_states = sprite
     }
 
     pass through {
+        resources = through
 		vertex = through
         fragment = through
         render_states = fullscreen

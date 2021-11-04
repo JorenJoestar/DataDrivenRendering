@@ -122,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui;..\..\source\Articles\GpuDrivenText</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -194,6 +194,8 @@
     <ClCompile Include="..\..\source\imgui\TextEditor.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\source\Articles\GpuDrivenText\generated\debug_gpu_text.bhfx2.h" />
+    <ClInclude Include="..\..\source\Articles\GpuDrivenText\generated\pixel_art.bhfx2.h" />
     <ClInclude Include="..\..\source\hydra_next\source\application\application.hpp" />
     <ClInclude Include="..\..\source\hydra_next\source\application\game_application.hpp" />
     <ClInclude Include="..\..\source\hydra_next\source\application\hydra_application.hpp" />

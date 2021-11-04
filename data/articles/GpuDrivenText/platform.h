@@ -19,3 +19,14 @@ vec3 world_position_from_depth( vec2 uv, float raw_depth, mat4 inverse_view_proj
 
     return D.xyz / D.w;
 }
+
+// Bindless textures test!
+#define HYDRA_BINDLESS
+
+#if defined(HYDRA_BINDLESS)
+
+#extension GL_EXT_nonuniform_qualifier : enable
+
+layout (binding = 10) uniform sampler2D textures[];
+
+#endif // HYDRA_BINDLESS

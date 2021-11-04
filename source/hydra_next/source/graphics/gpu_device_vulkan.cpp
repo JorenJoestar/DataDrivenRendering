@@ -404,11 +404,11 @@ void Device::pop_gpu_timestamp( CommandBuffer* command_buffer ) {
 
 static CommandBufferRing command_buffer_ring;
 
-//#define HYDRA_BINDLESS
+#define HYDRA_BINDLESS
 
 // gsBindless
 static const u32        k_bindless_texture_binding = 10;
-static const u32        k_max_bindless_resources = 32;
+static const u32        k_max_bindless_resources = 1024;
 
 void GpuDeviceVulkan::internal_init( const DeviceCreation& creation ) {
 
@@ -653,7 +653,7 @@ void GpuDeviceVulkan::internal_init( const DeviceCreation& creation ) {
     VkDescriptorPoolSize pool_sizes[] =
     {
         { VK_DESCRIPTOR_TYPE_SAMPLER, k_global_pool_elements },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, k_global_pool_elements },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, k_max_bindless_resources },
         { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, k_global_pool_elements },
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, k_global_pool_elements },
         { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, k_global_pool_elements },
@@ -1589,12 +1589,19 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
 
     // TODO: add support for multiple sets.
     // Create flattened binding list
-    resource_layout->num_bindings = creation.num_bindings;
+    resource_layout->num_bindings = (u16)creation.num_bindings;
     resource_layout->bindings = ( ResourceBindingVulkan* )halloca( sizeof( ResourceBindingVulkan ) * creation.num_bindings, allocator );
     resource_layout->vk_binding = ( VkDescriptorSetLayoutBinding* )halloca( sizeof( VkDescriptorSetLayoutBinding ) * creation.num_bindings, allocator );
     resource_layout->handle = handle;
+    resource_layout->max_binding = 0;
 
+#if defined (HYDRA_BINDLESS)
     bool bindless_descriptor = false;
+    u32 max_binding = 0;
+
+    VkDescriptorBindingFlags bindless_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT ;
+    VkDescriptorBindingFlags binding_flags[ 32 ];
+#endif
 
     for ( uint32_t r = 0; r < creation.num_bindings; ++r ) {
         ResourceBindingVulkan& binding = resource_layout->bindings[ r ];
@@ -1604,26 +1611,28 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
         binding.type = ( u16 )input_binding.type;
         binding.name = input_binding.name;
 
+#if defined (HYDRA_BINDLESS)
+        binding_flags[ r ] = 0;
+#endif // HYDRA_BINDLESS
+
         VkDescriptorSetLayoutBinding& vk_binding = resource_layout->vk_binding[ r ];
         vk_binding.binding = binding.start;
         vk_binding.descriptorType = to_vk_descriptor_type( input_binding.type );
+        vk_binding.descriptorType = vk_binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : vk_binding.descriptorType;
+        vk_binding.descriptorCount = 1;
+
 #if defined (HYDRA_BINDLESS)
         if ( binding.type == ResourceType::Texture ) {
-            // TODO: hardcoded bindless values to test functionality
             bindless_descriptor = true;
+
+            binding_flags[ r ] = bindless_flags;
+
+            // TODO: hardcoded bindless values to test functionality
             vk_binding.descriptorCount = k_max_bindless_resources;
             vk_binding.binding = k_bindless_texture_binding;
         }
-        else {
-            vk_binding.descriptorCount = 1;
-            // TODO: still need to improve this!
-            vk_binding.descriptorType = vk_binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : vk_binding.descriptorType;
-        }
-        
-#else
-        vk_binding.descriptorCount = 1;
-        // TODO: default to dynamic constants
-        vk_binding.descriptorType = vk_binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : vk_binding.descriptorType;
+
+        max_binding = hydra_max( max_binding, vk_binding.binding );
 #endif // HYDRA_BINDLESS
 
         // TODO:
@@ -1638,17 +1647,17 @@ ResourceLayoutHandle GpuDeviceVulkan::create_resource_layout( const ResourceLayo
 
 #if defined (HYDRA_BINDLESS)
     if ( bindless_descriptor ) {
-        VkDescriptorBindingFlags binding_flag[] = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT,
-                                                     VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT };
         VkDescriptorSetLayoutBindingFlagsCreateInfoEXT extended_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT, nullptr };
         extended_info.bindingCount = creation.num_bindings;
-        extended_info.pBindingFlags = binding_flag;
+        extended_info.pBindingFlags = binding_flags;
         // Bindless: need to have partially bound flags to be on all descriptors.
         // Find a way to overcome this.
-        hy_assert( creation.num_bindings <= ArraySize( binding_flag ) );
+        hy_assert( creation.num_bindings <= ArraySize( binding_flags ) );
 
         layout_info.pNext = &extended_info;
     }
+
+    resource_layout->max_binding = (u16)max_binding;
 #endif // HYDRA_BINDLESS
 
     vkCreateDescriptorSetLayout( vulkan_device, &layout_info, vulkan_allocation_callbacks, &resource_layout->vk_descriptor_set_layout );
@@ -1705,6 +1714,7 @@ static void vulkan_fill_write_descriptor_sets( GpuDeviceVulkan& gpu, const Resou
                 descriptor_write[ i ].pImageInfo = &image_info[ i ];
 
 #if defined (HYDRA_BINDLESS)
+                descriptor_write[ i ].dstBinding = k_bindless_texture_binding;
                 descriptor_write[ i ].dstArrayElement = texture_handle.index;
 #endif
 
@@ -1816,12 +1826,24 @@ ResourceListHandle GpuDeviceVulkan::create_resource_list( const ResourceListCrea
     const ResourceLayoutVulkan* resource_list_layout = access_resource_layout( creation.layout );
 
     // Allocate descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocInfo.descriptorPool = vulkan_descriptor_pool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &resource_list_layout->vk_descriptor_set_layout;
+    VkDescriptorSetAllocateInfo alloc_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    alloc_info.descriptorPool = vulkan_descriptor_pool;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &resource_list_layout->vk_descriptor_set_layout;
 
-    vkAllocateDescriptorSets( vulkan_device, &allocInfo, &resource_list->vk_descriptor_set );
+#if defined(HYDRA_BINDLESS)
+    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT count_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
+    u32 max_binding = resource_list_layout->max_binding + 1;
+    // Use variable descriptor only on layouts that have bindless resources.
+    if ( bindless_supported && resource_list_layout->max_binding >= k_bindless_texture_binding ) {
+        count_info.descriptorSetCount = 1;
+        // This number is the max allocatable count
+        count_info.pDescriptorCounts = &max_binding;
+        alloc_info.pNext = &count_info;
+    }
+#endif // HYDRA_BINDLESS
+
+    check( vkAllocateDescriptorSets( vulkan_device, &alloc_info, &resource_list->vk_descriptor_set ) );
     // Cache data
     resource_list->resources = ( ResourceHandle* )halloca( sizeof( ResourceHandle ) * creation.num_resources, allocator );
     resource_list->samplers = ( SamplerHandle* )halloca( sizeof( SamplerHandle ) * creation.num_resources, allocator );

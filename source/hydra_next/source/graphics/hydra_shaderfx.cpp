@@ -1,4 +1,4 @@
-// Hydra HFX v0.50
+// Hydra HFX v0.51
 
 #include "hydra_shaderfx.h"
 
@@ -1768,7 +1768,7 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
     if ( reflection_buffer ) {
         using json = nlohmann::json;
 
-        reflection_buffer->append_f( "\tnamespace %s {\n\n", namespace_name );
+        reflection_buffer->append_f( "\t\tnamespace %s {\n\n", namespace_name );
         json types = parsed_json[ "types" ];
 
         std::string name_str;
@@ -1802,7 +1802,7 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
             written_types.insert( type_hash, 1 );
             
 
-            reflection_buffer->append_f( "\t\tstruct %s {\n", name_str.c_str() );
+            reflection_buffer->append_f( "\t\t\tstruct %s {\n", name_str.c_str() );
 
             json members = definition[ "members" ];
 
@@ -1870,7 +1870,7 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
                     if ( member_memory_offset < current_member_offset ) {
                         while ( member_memory_offset < current_member_offset ) {
 
-                            reflection_buffer->append_f( "\t\t\tuint32_t\t\t\t\tpad%d;\n", padding_added++ );
+                            reflection_buffer->append_f( "\t\t\t\tuint32_t\t\t\t\tpad%d;\n", padding_added++ );
                             ++member_memory_offset;
                         }
                     }
@@ -1880,13 +1880,13 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
                 }
 
                 // Write type
-                reflection_buffer->append_f( "\t\t\t%s", name_str.c_str() );
+                reflection_buffer->append_f( "\t\t\t\t%s", name_str.c_str() );
                 // Write name
                 name.get_to( name_str );
-                reflection_buffer->append_f( "\t\t\t\t%s;\n", name_str.c_str() );
+                reflection_buffer->append_f( "\t\t\t\t\t%s;\n", name_str.c_str() );
             }
 
-            reflection_buffer->append_f( "\t\t};\n\n" );
+            reflection_buffer->append_f( "\t\t\t};\n\n" );
         }
 
         // Write resource indices
@@ -1897,7 +1897,7 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
             u32 binding = ubo.value( "binding", 0 );
 
             ubo[ "name" ].get_to( name_str );
-            reflection_buffer->append_f( "\t\tstatic const uint32_t binding_cb_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
+            reflection_buffer->append_f( "\t\t\tstatic const uint32_t binding_cb_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
 
             reflection_update_automatic_binding( out_bindings, binding, namespace_name, name_str.c_str(), hydra::gfx::ResourceType::Constants );
         }
@@ -1908,7 +1908,7 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
             u32 set = texture.value( "set", 0 );
             u32 binding = texture.value( "binding", 0 );
             texture[ "name" ].get_to( name_str );
-            reflection_buffer->append_f( "\t\tstatic const uint32_t binding_tex_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
+            reflection_buffer->append_f( "\t\t\tstatic const uint32_t binding_tex_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
 
             reflection_update_automatic_binding( out_bindings, binding, namespace_name, name_str.c_str(), hydra::gfx::ResourceType::Texture );
         }
@@ -1919,12 +1919,12 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
             u32 set = ssbo.value( "set", 0 );
             u32 binding = ssbo.value( "binding", 0 );
             ssbo[ "name" ].get_to( name_str );
-            reflection_buffer->append_f( "\t\tstatic const uint32_t binding_sb_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
+            reflection_buffer->append_f( "\t\t\tstatic const uint32_t binding_sb_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
 
             reflection_update_automatic_binding( out_bindings, binding, namespace_name, name_str.c_str(), hydra::gfx::ResourceType::StructuredBuffer );
         }
 
-        reflection_buffer->append_f( "\n\t} // namespace %s\n\n", namespace_name );
+        reflection_buffer->append_f( "\n\t\t} // namespace %s\n\n", namespace_name );
 
         written_types.shutdown();
     }
@@ -2652,6 +2652,18 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
     if ( generate_reflection_data ) {
         const char* shader_name = filename_buffer.append_use( code_generator->parser->shader.name );
         reflection_buffer.append_f( "namespace %s {\n", shader_name );
+        reflection_buffer.append_f( "\n\tstatic hydra::gfx::ResourceListCreation tables[ %u ];\n\n", pass_count );
+
+        // Add pass index at the beginning
+        for ( uint32_t i = 0; i < pass_count; i++ ) {
+            const Pass& pass = code_generator->parser->shader.passes[ i ];
+
+            reflection_buffer.append_f( "\tstatic const uint32_t\t\tpass_" );
+            reflection_buffer.append( pass.name );
+            reflection_buffer.append_f( " = %u;\n", i );
+        }
+
+        reflection_buffer.append_f( "\tstatic const uint32_t\t\tpass_count = %u;\n\n", pass_count );
     }
 
     hfx::ResourceBinding pass_bindings[ 32 ];
@@ -2669,10 +2681,9 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
         StringRef::copy_to( pass.name, pass_blueprint.name, 32 );
         StringRef::copy_to( pass.stage_name, pass_blueprint.stage_name, 32 );
 
-        // Add named pass index
-        if ( generate_reflection_data ) {
-            reflection_buffer.append_f( "\n\tstatic const uint32_t\t\tpass_%s = %u;\n\n", pass_blueprint.name, i );
-        }
+        // Add per pass namespace
+        char* pass_name_C = filename_buffer.append_use( pass.name );
+        reflection_buffer.append_f( "\tnamespace %s {\n", pass_name_C );
 
         pass_blueprint.compute_dispatch = pass.compute_dispatch;
         pass_blueprint.is_spirv = ( ( code_generator->options & CompileOptions_SpirV ) == CompileOptions_SpirV ) ? 1 : 0;
@@ -2706,16 +2717,14 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
                 char* arguments = filename_buffer.append_use_f( "spirv-cross.exe %s --reflect --output %s", compiled_filename, reflection_filename );
                 hydra::process_execute( ".", spirv_cross_path, arguments );
 
-                char* pass_name_C = filename_buffer.append_use( pass.name );
-                char* namespace_name = filename_buffer.append_use_f( "%s_%s", pass_name_C, s_shader_compiler_stage[ shader_stage.stage ] );
-
                 // Open generated reflection json file.
                 using json = nlohmann::json;
                 char* reflection_json_memory = hydra::file_read_text( reflection_filename, code_generator->parser->allocator, nullptr );
                 json reflection_json = json::parse( reflection_json_memory );
 
-                append_reflection_data( reflection_json, namespace_name, &reflection_buffer, code_generator->name_to_type,
-                                        filename_buffer, automatic_layout ? pass_bindings : nullptr, code_generator->parser->allocator );
+                // Search binding points from reflection data
+                append_reflection_data( reflection_json, s_shader_compiler_stage[ shader_stage.stage ], &reflection_buffer, code_generator->name_to_type,
+                                        filename_buffer, pass_bindings, code_generator->parser->allocator );
 
                 if ( ( compile_options & CompileOptions_Output_Files ) != CompileOptions_Output_Files )
                     hydra::file_delete( reflection_filename );
@@ -2755,25 +2764,76 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
             pass_blueprint.vertex_streams.size = 0;
         }
 
-        // Resource Layouts
+        // Create resource list to reflection map
+        hydra::FlatHashMap<u64, u32> name_to_binding;
+        name_to_binding.init( code_generator->parser->allocator, 16 );
+        name_to_binding.set_default_value( u32_max );
+
+        for ( u32 rb = 0; rb < 32; ++rb ) {
+            if ( pass_bindings[ rb ].count != 0 ) {
+                name_to_binding.insert( hydra::hash_calculate( pass_bindings[ rb ].name ), pass_bindings[ rb ].start );
+            }
+        }
+
         const u32 num_layouts = (u32)pass.resource_lists.size();
         blob.allocate_and_set<ResourceLayoutBlueprint>( pass_blueprint.resource_layouts, num_layouts + automatic_layout ? 1 : 0 );
         for ( u32 l = 0; l < num_layouts; ++l ) {
-            const ResourceList* resource_list = pass.resource_lists[ l ];
+            ResourceList* resource_list = (ResourceList*)pass.resource_lists[ l ];
 
             const u8 num_resources = ( u8 )resource_list->resources.size();
+            // Patch binding points and output layout indices
+            for ( u32 r = 0; r < num_resources; ++ r) {
+                ResourceBinding& rb = resource_list->resources[ r ];
+                u16 binding_point = (u16)name_to_binding.get( hydra::hash_calculate( rb.name ) );
+                rb.start = binding_point;
+
+                reflection_buffer.append_f( "\t\tstatic const uint32_t layout_%s = %u;\n", rb.name, r );
+            }
 
             ResourceLayoutBlueprint& resource_layout_blueprint = pass_blueprint.resource_layouts[ l ];
             blob.allocate_and_set<ResourceBinding>( resource_layout_blueprint.bindings, num_resources, (void*)resource_list->resources.data() );
         }
-        // Append
+
+        char* pass_name_c = filename_buffer.append_use( pass.name );
+
+        // Output Table to quickly setup resources
+        if ( generate_reflection_data ) {
+            reflection_buffer.append_f( "\n\t\tstruct Table {\n\t\t\tTable& reset() {\n\t\t\t\trlc = &tables[ pass_%s ];\n\t\t\t\trlc->reset();\n\t\t\t\treturn *this;\n\t\t\t}\n", pass_name_c );
+            
+            for ( u32 l = 0; l < num_layouts; ++l ) {
+                ResourceList* resource_list = ( ResourceList* )pass.resource_lists[ l ];
+
+                const u8 num_resources = ( u8 )resource_list->resources.size();
+                // Patch binding points and output layout indices
+                for ( u32 r = 0; r < num_resources; ++r ) {
+                    ResourceBinding& rb = resource_list->resources[ r ];
+
+                    switch ( rb.type ) {
+                        case hydra::gfx::ResourceType::Constants:
+                        case hydra::gfx::ResourceType::StructuredBuffer:
+                        {
+                            reflection_buffer.append_f( "\t\t\tTable& set_%s( hydra::gfx::Buffer* buffer ) {\n", rb.name );
+                            reflection_buffer.append_f( "\t\t\t\trlc->buffer( buffer->handle, layout_%s );\n\t\t\t\treturn *this;\n\t\t\t}\n", rb.name );
+                            break;
+                        }
+
+                        case hydra::gfx::ResourceType::Texture:
+                        {
+                            reflection_buffer.append_f( "\t\t\tTable& set_%s( hydra::gfx::Texture* texture ) {\n", rb.name );
+                            reflection_buffer.append_f( "\t\t\t\trlc->texture( texture->handle, layout_%s );\n\t\t\t\treturn *this;\n\t\t\t}\n", rb.name );
+                            break;
+                        }
+                    }
+                }
+            }
+
+            reflection_buffer.append_f( "\n\t\t\thydra::gfx::ResourceListCreation* rlc;\n\t\t}; // struct Table\n\n" );
+            reflection_buffer.append_f( "\n\t\tstatic Table& table() { static Table s_table; return s_table; }\n\n" );
+        }
+        
         // Optionally if properties are present but no layout is specified for them, add the final resource layout.        
         if ( automatic_layout ) {
             ResourceList automatic_resource_list;
-
-            char* pass_name_C = filename_buffer.append_use( pass.name );
-
-            reflection_buffer.append_f("\tnamespace %s {\n", pass_name_C );
 
             for ( u32 rb = 0; rb < 32; ++rb ) {
                 if ( pass_bindings[ rb ].count != 0 ) {
@@ -2785,12 +2845,13 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
                 }
             }
 
-            reflection_buffer.append_f("\t}\n");
-
             ResourceLayoutBlueprint& resource_layout_blueprint = pass_blueprint.resource_layouts[ num_layouts ];
             blob.allocate_and_set<ResourceBinding>( resource_layout_blueprint.bindings, (u32)automatic_resource_list.resources.size(), ( void* )automatic_resource_list.resources.data() );
         }
+
+        reflection_buffer.append_f( "\t} // pass %s\n\n", pass_name_c );
     }
+
 
     // Output to HFX and generated c++ file if compilation is good
     if ( compilation_succeeded ) {
@@ -2815,7 +2876,8 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
             const char* filename_string = filename_buffer.append_use_f( "%s//%s.h", code_generator->cpp_generated_folder, generated_output_name );
             FILE* reflection_file = fopen( filename_string, "w+" );
             if ( reflection_file ) {
-                reflection_buffer.append( "} //\n" );
+                const char* shader_name = filename_buffer.append_use( code_generator->parser->shader.name );
+                reflection_buffer.append_f( "\n} // shader %s\n", shader_name );
 
                 fwrite( reflection_buffer.data, reflection_buffer.current_size, 1, reflection_file );
                 fclose( reflection_file );

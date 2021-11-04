@@ -1,12 +1,20 @@
 shader pixel_art {
 
 	layout {
+
+        list Local {
+            cbuffer Local;
+            texture2D albedo;
+            sbuffer DebugGpuFontBuffer;
+            sbuffer DebugGpuFontEntries;
+        }
         
         vertex sprite_instance {
-            binding 0 48 instance
+            binding 0 52 instance
             attribute float4 position 0 0 0
             attribute float4 uv_size_offset 0 1 16
             attribute float4 size 0 2 32
+            attribute uint albedo_id 0 3 48
         }
     }
 
@@ -47,8 +55,10 @@ shader pixel_art {
         layout (location = 0) in vec4 position;
         layout (location = 1) in vec4 uv_size_offset;
         layout (location = 2) in vec4 size_ssflag_alpha;
+        layout (location = 3) in uint albedo_id; 
 
         layout (location = 0) out vec4 uv_alpha;
+        layout (location = 1) flat out uint out_albedo_id;
 
         #pragma include "debug_gpu_font.h"
 
@@ -73,6 +83,9 @@ shader pixel_art {
             uv_alpha.z = size_ssflag_alpha.w;
 
             gl_Position = size_ssflag_alpha.z > 0 ? locals.projection_matrix_2d * world_position : locals.view_projection_matrix * world_position;
+
+            // Pass through albedo id
+            out_albedo_id = albedo_id;
 
             if ( vertex_index == 0 ) {
                 uint entry_index = atomicAdd(current_entry_index, 1);
@@ -107,11 +120,16 @@ shader pixel_art {
 
         #if defined FRAGMENT
 
+        #pragma include "platform.h"
+
         layout (location = 0) in vec4 uv_alpha;
+        layout (location = 1) flat in uint albedo_id;
+
+#if !defined(HYDRA_BINDLESS)
+        layout (binding = 1) uniform sampler2D albedo;
+#endif // !HYDRA_BINDLESS
 
         layout (location = 0) out vec4 out_color;
-
-        layout (binding = 1) uniform sampler2D albedo;
 
         vec2 uv_nearest( vec2 uv, ivec2 texture_size ) {
             vec2 pixel = uv * texture_size;
@@ -133,10 +151,17 @@ shader pixel_art {
 
 		void main() {
 
+#if defined(HYDRA_BINDLESS)
+            ivec2 texture_size = textureSize(textures[albedo_id], 0);
+            vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
+
+            vec4 color = texture( textures[albedo_id], final_uv.xy );
+#else
             ivec2 texture_size = textureSize(albedo, 0);
             vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
 
             vec4 color = texture( albedo, final_uv.xy );
+#endif // HYDRA_BINDLESS
             if (color.a < 0.01)
                 discard;
 

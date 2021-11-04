@@ -1,6 +1,6 @@
 
 //
-// Hydra HFX v0.50
+// Hydra HFX v0.51
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
@@ -9,6 +9,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.51  (2021/11/02): + Empowered generated code by adding table helper to fill ResourceListCreation.
 //      0.50  (2021/10/27): + Added generated c++ folder as hfx_compile parameter to control generated file output.
 //      0.49  (2021/10/25): + Fixed a reflection duplication bug coming from the generated json.
 //      0.48  (2021/10/24): + Added support for Structured Buffers in layouts. + Added support for automatic layout from reflection data.
