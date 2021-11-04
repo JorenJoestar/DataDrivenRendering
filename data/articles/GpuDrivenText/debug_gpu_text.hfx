@@ -273,12 +273,22 @@ shader gpu_text {
 
         layout (location = 0) out vec2 vTexCoord;
 
+#if defined(HYDRA_BINDLESS)
+        layout (location = 1) flat out uint texture_id;
+#endif // !HYDRA_BINDLESS
+
         void main() {
 
             vTexCoord.xy = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
             gl_Position = vec4(vTexCoord.xy * 2.0f - 1.0f, 0.0f, 1.0f);
             // If rendering to a RenderTarget, flip Y
             gl_Position.y = -gl_Position.y;
+
+#if defined(HYDRA_BINDLESS)
+            // Using instance index to simply read an uint
+            // storing the texture index in the bindless array.
+            texture_id = gl_InstanceIndex;
+#endif // !HYDRA_BINDLESS
         }
 
         #endif // VERTEX
@@ -289,14 +299,16 @@ shader gpu_text {
 
         layout (location = 0) out vec4 out_color;
 
-#if !defined(HYDRA_BINDLESS)
+#if defined(HYDRA_BINDLESS)
+        layout (location = 1) flat in uint texture_id;
+#else
         layout (binding = 1) uniform sampler2D albedo;
-#endif // !HYDRA_BINDLESS
+#endif // HYDRA_BINDLESS
 
 		void main() {
 
 #if defined(HYDRA_BINDLESS)
-            vec4 color = texture( textures[3], vTexCoord.xy );
+            vec4 color = texture( textures[texture_id], vTexCoord.xy );
 #else
             vec4 color = texture( albedo, vTexCoord.xy );
 #endif // HYDRA_BINDLESS

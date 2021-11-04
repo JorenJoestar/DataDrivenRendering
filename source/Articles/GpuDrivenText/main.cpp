@@ -107,11 +107,12 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
 
     // Forward resources
     TextureCreation rt{};
-    rt.set_size( gfx->width, gfx->height, 1 ).set_format_type( TextureFormat::B8G8R8A8_UNORM, TextureType::Texture2D ).set_flags( 1, TextureCreationFlags::RenderTarget_mask ).set_name( "Main RT" );
+    rt.set_size( gfx->width, gfx->height, 1 ).set_format_type( TextureFormat::D32_FLOAT_S8X24_UINT, TextureType::Texture2D ).set_flags( 1, TextureCreationFlags::RenderTarget_mask ).set_name( "Main Depth" );
+    main_depth = gfx->create_texture( rt );
+
+    rt.set_format_type( TextureFormat::B8G8R8A8_UNORM, TextureType::Texture2D ).set_name( "Main RT" );
     main_texture = gfx->create_texture( rt );
 
-    rt.set_format_type( TextureFormat::D32_FLOAT_S8X24_UINT, TextureType::Texture2D ).set_name( "Main Depth" );
-    main_depth = gfx->create_texture( rt );
 
     // Stage Creation
     RenderStageCreation rsc;
@@ -308,7 +309,8 @@ bool hg04::main_loop() {
         
         cb->bind_pipeline( sort_key++, debug_gpu_font_material->pipelines[ gpu_text::pass_through ] );
         cb->bind_resource_list( sort_key++, &debug_gpu_font_material->resource_lists[ gpu_text::pass_through ], 1, 0, 0 );
-        cb->draw( sort_key++, hydra::gfx::TopologyType::Triangle, 0, 3, 0, 1 );
+        // Use first_instance to retrieve texture ID for bindless use.
+        cb->draw( sort_key++, hydra::gfx::TopologyType::Triangle, 0, 3, main_texture->handle.index, 1 );
         cb->pop_marker();
 
         // Draw fullscreen debug text or sprite based
