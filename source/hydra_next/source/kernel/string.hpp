@@ -42,6 +42,12 @@ namespace hydra {
         char*                       append_use( const StringView& text );       // Append and returns a pointer to the start. Used for strings mostly.
         char*                       append_use_substring( const char* string, u32 start_index, u32 end_index ); // Append a substring of the passed string.
 
+        void                        close_current_string();
+
+        // Index interface
+        u32                         get_index( cstring text ) const;
+        cstring                     get_text( u32 index ) const;
+
         char*                       reserve( sizet size );
 
         char*                       current()       { return data + current_size; }

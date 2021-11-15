@@ -54,6 +54,7 @@ struct BlobSerializer {
     void                serialize( cstring data );
 
     void                serialize_memory( void* data, sizet size );
+    void                serialize_memory_block( void** data, u32* size );
 
     template <typename T>
     void                serialize( RelativePointer<T>* data );
@@ -98,8 +99,10 @@ struct BlobSerializer {
     u32                 serializer_version  = 0xffffffff;   // Version coming from the code.
     u32                 data_version        = 0xffffffff;   // Version read from blob or written into blob.
 
-    u32                 is_reading      = 0;
-    u32                 is_mappable     = 0;
+    u32                 is_reading          = 0;
+    u32                 is_mappable         = 0;
+
+    u32                 has_allocated_memory = 0;
     
 }; // struct BlobSerializer
 
@@ -112,8 +115,8 @@ T* BlobSerializer::write_and_prepare( Allocator* allocator_, u32 serializer_vers
 
     write_common( allocator_, serializer_version_, size );
 
-    // Allocate root data
-    allocate_static( sizeof( T ) );
+    // Allocate root data. BlobHeader is already allocated in the write_common method.
+    allocate_static( sizeof( T ) - sizeof( BlobHeader ) );
 
     // Manually manage blob serialization.
     data_memory = nullptr;
@@ -129,8 +132,8 @@ void BlobSerializer::write_and_serialize( Allocator* allocator_, u32 serializer_
 
     write_common( allocator_, serializer_version_, size );
 
-    // Allocate root data
-    allocate_static( sizeof( T ) );
+    // Allocate root data. BlobHeader is already allocated in the write_common method.
+    allocate_static( sizeof( T ) - sizeof( BlobHeader ) );
 
     // Save root data memory for offset calculation
     data_memory = ( char* )data;
@@ -150,6 +153,7 @@ T* BlobSerializer::read( Allocator* allocator_, u32 serializer_version_, sizet s
 
     serializer_version = serializer_version_;
     is_reading = 1;
+    has_allocated_memory = 0;
 
     // Read header from blob.
     BlobHeader* header = ( BlobHeader* )blob_memory;
@@ -162,6 +166,7 @@ T* BlobSerializer::read( Allocator* allocator_, u32 serializer_version_, sizet s
         return ( T* )( blob_memory );
     }
 
+    has_allocated_memory = 1;
     serializer_version = data_version;
 
     // Allocate data
@@ -315,7 +320,72 @@ inline void BlobSerializer::serialize( RelativeArray<T>* data ) {
 template<typename T>
 inline void BlobSerializer::serialize( Array<T>* data ) {
 
-    hy_assert( false );
+    if ( is_reading ) {
+        // Blob --> Data
+        serialize( &data->size );
+
+        u64 serialization_pad;
+        serialize( &serialization_pad );
+        serialize( &serialization_pad );
+
+        u32 packed_data_offset;
+        serialize( &packed_data_offset );
+        i32 source_data_offset = ( u32 )( packed_data_offset & 0x7fffffff );
+
+        // Cache serialized
+        u32 cached_serialized = serialized_offset;
+
+        data->allocator = nullptr;
+        data->capacity = data->size;
+        //data->relative = ( packed_data_offset >> 31 );
+        // Point straight to the end
+        data->data = ( T* )( data_memory + allocated_offset );
+        //data->data.offset = get_relative_data_offset( data ) - 4;
+
+        // Reserve memory
+        allocate_static( data->size * sizeof( T ) );
+        // 
+        serialized_offset = cached_serialized + source_data_offset - sizeof( u32 );// -sizeof( u64 ) * 2;
+
+        for ( u32 i = 0; i < data->size; ++i ) {
+            T* destination = &( ( *data )[ i ] );
+            serialize( destination );
+
+            destination = destination;
+        }
+        // Restore serialized
+        serialized_offset = cached_serialized;
+
+    } else {
+        // Data --> Blob
+        serialize( &data->size );
+        // Add serialization pads so that we serialize all bytes of the struct Array.
+        u64 serialization_pad = 0;
+        serialize( &serialization_pad );
+        serialize( &serialization_pad );
+
+        // Data will be copied at the end of the current blob
+        i32 data_offset = allocated_offset - serialized_offset;
+        // Set higher bit of flag
+        u32 packed_data_offset = ( ( u32 )data_offset | ( 1 << 31 ) );
+        serialize( &packed_data_offset );
+
+        u32 cached_serialized = serialized_offset;
+        // Move serialization to the newly allocated memory,
+        // at the end of the blob.
+        serialized_offset = allocated_offset;
+        // Allocate memory in the blob
+        allocate_static( data->size * sizeof( T ) );
+
+        for ( u32 i = 0; i < data->size; ++i ) {
+            T* source_data = &( ( *data )[ i ] );
+            serialize( source_data );
+
+            source_data = source_data;
+        }
+        // Restore serialized
+        serialized_offset = cached_serialized;
+    }
 }
 
 template<typename T>

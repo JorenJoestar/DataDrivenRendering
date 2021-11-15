@@ -3,6 +3,7 @@
 #include "kernel/service_manager.hpp"
 #include "kernel/memory.hpp"
 #include "kernel/log.hpp"
+#include "kernel/time.hpp"
 
 #include "application/window.hpp"
 #include "application/hydra_input.hpp"
@@ -34,6 +35,8 @@ void GameApplication::create( const hydra::ApplicationConfiguration& configurati
     using namespace hydra;
     // Init services
     MemoryService::instance()->init( nullptr );
+
+    time_service_init();
 
     service_manager = ServiceManager::instance;
     service_manager->init( &MemoryService::instance()->system_allocator );
@@ -85,6 +88,8 @@ void GameApplication::destroy() {
     gfx->shutdown();
     window->shutdown();
 
+    time_service_shutdown();
+
     service_manager->shutdown();
 
     hydra::MemoryService::instance()->shutdown();
@@ -106,7 +111,7 @@ bool GameApplication::main_loop() {
         window->handle_os_messages();
 
         if ( window->resized ) {
-            gfx->on_resize( window->width, window->height );
+            gfx->resize_swapchain( window->width, window->height );
             on_resize( window->width, window->height );
             window->resized = false;
         }
@@ -134,7 +139,7 @@ bool GameApplication::main_loop() {
 
         if ( !window->minimized ) {
             // Draw debug UIs
-            hydra::MemoryService::instance()->debug_ui();
+            hydra::MemoryService::instance()->imgui_draw();
 
             hydra::gfx::CommandBuffer* gpu_commands = gfx->get_command_buffer( hydra::gfx::QueueType::Graphics, true );
             gpu_commands->push_marker( "Frame" );

@@ -6,6 +6,7 @@
 namespace hydra {
 
     struct Allocator;
+    struct StringArray;
 
 #if defined(_WIN64)
 
@@ -75,13 +76,10 @@ namespace hydra {
     void                            file_parent_directory( Directory* directory );
     void                            file_sub_directory( Directory* directory, cstring sub_directory_name );
 
-#if defined (HY_STB)
-    // TODO: implement StringArray
     void                            file_find_files_in_path( cstring file_pattern, StringArray& files );            // Search files matching file_pattern and puts them in files array.
                                                                                                                     // Examples: "..\\data\\*", "*.bin", "*.*"
     void                            file_find_files_in_path( cstring extension, cstring search_pattern,
                                                              StringArray& files, StringArray& directories );        // Search files and directories using search_patterns.
-#endif // HY_STB
 
     // TODO: move
     void                            environment_variable_get( cstring name, char* output, u32 output_size );

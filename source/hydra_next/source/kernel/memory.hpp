@@ -118,13 +118,13 @@ namespace hydra {
     }; // struct DoubleStackAllocator
 
     //
-    // Allocator that uses static memory to allocate/deallocate in a linear way.
+    // Allocator that can only be reset.
     //
     struct LinearAllocator : public Allocator {
 
         ~LinearAllocator();
 
-        void                        init( void* static_memory, sizet size );
+        void                        init( sizet size );
         void                        shutdown();
 
         void*                       allocate( sizet size, sizet alignment ) override;
@@ -132,8 +132,7 @@ namespace hydra {
 
         void                        deallocate( void* pointer ) override;
 
-        void                        free( sizet size );
-        void                        free_all();
+        void                        clear();
 
         u8*                         memory          = nullptr;
         sizet                       total_size      = 0;
@@ -160,7 +159,7 @@ namespace hydra {
         void                        shutdown();
 
 #if defined HYDRA_IMGUI
-        void                        debug_ui();
+        void                        imgui_draw();
 #endif // HYDRA_IMGUI
 
         // Frame allocator
@@ -181,5 +180,9 @@ namespace hydra {
     #define hallocat(type, allocator)   ((type*)(allocator)->allocate( sizeof(type), 1, __FILE__, __LINE__ ))
 
     #define hfree(pointer, allocator) (allocator)->deallocate(pointer)
+
+    #define hkilo(size)                 (size * 1024)
+    #define hmega(size)                 (size * 1024 * 1024)
+    #define hgiga(size)                 (size * 1024 * 1024 * 1024)
 
 } // namespace hydra

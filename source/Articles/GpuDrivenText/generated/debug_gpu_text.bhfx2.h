@@ -18,7 +18,7 @@ namespace gpu_text {
 				float					gl_CullDistance;
 			};
 
-			static const uint32_t binding_tex_textures = 10; // Set 0, binding 10
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 
 		} // namespace vert
 
@@ -58,7 +58,7 @@ namespace gpu_text {
 				uint					pad03;
 			};
 
-			static const uint32_t binding_tex_textures = 10; // Set 0, binding 10
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 			static const uint32_t binding_sb_DebugGpuFontBuffer = 2; // Set 0, binding 2
 			static const uint32_t binding_sb_DebugGpuFontEntries = 3; // Set 0, binding 3
 			static const uint32_t binding_sb_DebugGPUFontDispatch = 4; // Set 0, binding 4
@@ -332,13 +332,13 @@ namespace gpu_text {
 				float					gl_CullDistance;
 			};
 
-			static const uint32_t binding_tex_textures = 10; // Set 0, binding 10
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 
 		} // namespace vert
 
 		namespace frag {
 
-			static const uint32_t binding_tex_textures = 10; // Set 0, binding 10
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 
 		} // namespace frag
 

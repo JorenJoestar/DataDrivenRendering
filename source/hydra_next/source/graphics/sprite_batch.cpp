@@ -26,10 +26,10 @@ void SpriteBatch::init( hydra::gfx::Renderer& renderer, Allocator* allocator ) {
 
     using namespace hydra::gfx;
 
-    BufferCreation vbc = { BufferType::Vertex_mask, ResourceUsageType::Dynamic, sizeof( SpriteGPUData ) * k_max_sprites, nullptr, "sprites_vb" };
+    BufferCreation vbc = { BufferType::Vertex_mask, ResourceUsageType::Dynamic, sizeof( SpriteGPUData ) * k_max_sprites, nullptr, "sprites_batch_vb" };
     sprite_instance_vb = renderer.create_buffer( vbc );
 
-    vbc.set_name( "sprite_cb" ).set( BufferType::Constant_mask, ResourceUsageType::Dynamic, sizeof( SpriteConstants ) );
+    vbc.set_name( "sprite_batch_cb" ).set( BufferType::Constant_mask, ResourceUsageType::Dynamic, sizeof( SpriteConstants ) );
     sprite_cb = renderer.create_buffer( vbc );
 
     current_pipeline.index = k_invalid_pipeline.index;
@@ -108,6 +108,10 @@ void SpriteBatch::set( hydra::gfx::PipelineHandle pipeline, hydra::gfx::Resource
 
     current_pipeline = pipeline;
     current_resource_list = resource_list;
+}
+
+void SpriteBatch::set( hydra::gfx::MaterialPass& pass ) {
+    set( pass.pipeline, pass.resource_list );
 }
 
 void SpriteBatch::draw( hydra::gfx::CommandBuffer* commands, u64& sort_key ) {

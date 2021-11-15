@@ -290,10 +290,10 @@ struct ResourceLayoutCreation {
     //
     struct Binding {
 
-        ResourceType::Enum          type = ResourceType::Constants;
-        u16                         start = 0;
-        u16                         count = 0;
-        char                        name[ 32 ];
+        ResourceType::Enum          type    = ResourceType::Constants;
+        u16                         start   = 0;
+        u16                         count   = 0;
+        cstring                     name    = nullptr;  // Comes from external memory.
     }; // struct Binding
 
     Binding                         bindings[ k_max_resources_per_list ];
@@ -408,7 +408,7 @@ struct RenderPassOutput {
 struct RenderPassCreation {
 
     u16                             num_render_targets  = 0;
-    RenderPassType::Enum            type                = RenderPassType::Standard;
+    RenderPassType::Enum            type                = RenderPassType::Geometry;
 
     TextureHandle                   output_textures[ k_max_image_outputs ];
     TextureHandle                   depth_stencil_texture;
@@ -638,12 +638,12 @@ struct ExecutionBarrier {
 
 //
 //
-struct ResourceDeletion {
+struct ResourceUpdate {
 
     ResourceDeletionType::Enum      type;
     ResourceHandle                  handle;
     u32                             current_frame;
-}; // struct ResourceDeletion
+}; // struct ResourceUpdate
 
 // API-gnostic resources ////////////////////////////////////////////////////////
 /*

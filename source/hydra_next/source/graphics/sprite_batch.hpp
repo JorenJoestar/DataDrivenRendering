@@ -13,7 +13,7 @@ struct Camera;
 struct CommandBuffer;
 struct Renderer;
 struct SpriteGPUData;
-
+struct MaterialPass;
 
 
 //
@@ -55,6 +55,7 @@ struct SpriteBatch {
 
     void                            add( SpriteGPUData& data );
     void                            set( hydra::gfx::PipelineHandle pipeline, hydra::gfx::ResourceListHandle resource_list );
+    void                            set( hydra::gfx::MaterialPass& pass );
 
     void                            draw( hydra::gfx::CommandBuffer* commands, u64& sort_key );
 

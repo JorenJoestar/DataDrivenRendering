@@ -2,6 +2,7 @@
 
 #include "kernel/memory.hpp"
 #include "kernel/assert.hpp"
+#include "kernel/string.hpp"
 
 #include <windows.h>
 
@@ -215,8 +216,6 @@ void file_sub_directory( Directory* directory, cstring sub_directory_name ) {
     file_open_directory( directory->path, directory );
 }
 
-#if defined (HY_STB)
-
 void file_find_files_in_path( cstring file_pattern, StringArray& files ) {
 
     files.clear();
@@ -262,8 +261,6 @@ void file_find_files_in_path( cstring extension, cstring search_pattern, StringA
         hprint( "Cannot find directory %s\n", search_pattern );
     }
 }
-
-#endif // HY_STB
 
 void environment_variable_get( cstring name, char* output, u32 output_size ) {
     ExpandEnvironmentStringsA( name, output, output_size );

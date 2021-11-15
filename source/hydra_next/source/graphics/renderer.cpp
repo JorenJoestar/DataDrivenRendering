@@ -1,5 +1,5 @@
-//
-//  Hydra Rendering - v0.38
+
+//  Hydra Rendering - v0.42
 
 #include "graphics/renderer.hpp"
 
@@ -7,6 +7,7 @@
 
 #include "graphics/hydra_shaderfx.h"
 #include "graphics/command_buffer.hpp"
+#include "graphics/camera.hpp"
 
 #include "imgui/imgui.h"
 
@@ -128,31 +129,41 @@ static TextureHandle create_texture_from_file( Device& gpu, cstring filename ) {
     
 
 // ClearData //////////////////////////////////////////////////////////////////////////////////////
-void ClearData::bind( u64& sort_key, CommandBuffer* gpu_commands ) {
+void ClearData::set( u64& sort_key, CommandBuffer* gpu_commands ) {
 
-    hy_assert( false );
-    /*if ( needs_color_clear )
-        gpu_commands->clear( sort_key++, clear_color[0], clear_color[1], clear_color[2], clear_color[3] );
+    if ( color_operation == RenderPassOperation::Clear ) {
+        gpu_commands->clear( sort_key++, clear_color[ 0 ], clear_color[ 1 ], clear_color[ 2 ], clear_color[ 3 ] );
+    }
 
-    if ( needs_depth_clear || needs_stencil_clear )
-        gpu_commands->clear_depth_stencil( sort_key++, depth_value, stencil_value );*/
+    if ( depth_operation == RenderPassOperation::Clear || stencil_operation == RenderPassOperation::Clear ) {
+        gpu_commands->clear_depth_stencil( sort_key++, depth_value, stencil_value );
+    }
 }
 
 ClearData& ClearData::reset() {
     color_operation = depth_operation = stencil_operation = RenderPassOperation::DontCare;
     return *this;
 }
-/*
 
 ClearData& ClearData::set_color( vec4s color ) {
-    color_operation[ 0 ] = color.x;
-    color_operation[ 1 ] = color.y;
-    color_operation[ 2 ] = color.z;
-    color_operation[ 3 ] = color.w;
+    clear_color[ 0 ] = color.x;
+    clear_color[ 1 ] = color.y;
+    clear_color[ 2 ] = color.z;
+    clear_color[ 3 ] = color.w;
 
-    needs_color_clear = 1;
+    color_operation = RenderPassOperation::Clear;
     return *this;
-}*/
+}
+
+ClearData& ClearData::set_color( ColorUint color ) {
+    clear_color[ 0 ] = color.r();
+    clear_color[ 1 ] = color.g();
+    clear_color[ 2 ] = color.b();
+    clear_color[ 3 ] = color.a();
+
+    color_operation = RenderPassOperation::Clear;
+    return *this;
+}
 
 ClearData& ClearData::set_depth( f32 depth ) {
     depth_value = depth;
@@ -184,12 +195,13 @@ void Renderer::init( const RendererCreation& creation ) {
    width = gpu->swapchain_width;
    height = gpu->swapchain_height;
 
-   textures.init( creation.allocator, 128, sizeof( Texture ) );
-   buffers.init( creation.allocator, 128, sizeof( Buffer ) );
-   samplers.init( creation.allocator, 128, sizeof( Sampler ) );
-   stages.init( creation.allocator, 128, sizeof( RenderStage ) );
-   shaders.init( creation.allocator, 128, sizeof( Shader ) );
-   materials.init( creation.allocator, 128, sizeof( Material ) );
+   textures.init( creation.allocator, 128 );
+   buffers.init( creation.allocator, 128 );
+   samplers.init( creation.allocator, 128 );
+   stages.init( creation.allocator, 128 );
+   shaders.init( creation.allocator, 128 );
+   materials.init( creation.allocator, 128 );
+   render_views.init( creation.allocator, 16 );
 }
 
 void Renderer::shutdown() {
@@ -200,6 +212,7 @@ void Renderer::shutdown() {
     stages.shutdown();
     shaders.shutdown();
     materials.shutdown();
+    render_views.shutdown();
 
     hprint( "Renderer shutdown\n" );
 
@@ -215,7 +228,7 @@ void Renderer::end_frame() {
     gpu->present();
 }
 
-void Renderer::on_resize( u32 width_, u32 height_ ) {
+void Renderer::resize_swapchain( u32 width_, u32 height_ ) {
     gpu->resize( (u16)width_, (u16)height_ );
 
     width = gpu->swapchain_width;
@@ -228,12 +241,10 @@ f32 Renderer::aspect_ratio() const {
 
 Buffer* Renderer::create_buffer( const BufferCreation& creation ) {
 
-    u32 index = buffers.obtain_resource();
-    if ( index != k_invalid_index ) {
+    Buffer* buffer = buffers.obtain();
+    if ( buffer ) {
         BufferHandle handle = gpu->create_buffer( creation );
-        Buffer* buffer = ( Buffer* )buffers.access_resource( index );
         buffer->handle = handle;
-        buffer->index = index;
         gpu->query_buffer( handle, buffer->desc );
 
         return buffer;
@@ -247,12 +258,11 @@ Buffer* Renderer::create_buffer( BufferType::Mask type, ResourceUsageType::Enum 
 }
 
 Texture* Renderer::create_texture( const TextureCreation& creation ) {
-    u32 index = textures.obtain_resource();
-    if ( index != k_invalid_index ) {
+    Texture* texture = textures.obtain();
+
+    if ( texture ) {
         TextureHandle handle = gpu->create_texture( creation );
-        Texture* texture = ( Texture* )textures.access_resource( index );
         texture->handle = handle;
-        texture->index = index;
         gpu->query_texture( handle, texture->desc );
 
         return texture;
@@ -261,12 +271,11 @@ Texture* Renderer::create_texture( const TextureCreation& creation ) {
 }
 
 Texture* Renderer::create_texture( cstring filename ) {
-    u32 index = textures.obtain_resource();
-    if ( index != k_invalid_index ) {
+    Texture* texture = textures.obtain();
+
+    if ( texture ) {
         TextureHandle handle = create_texture_from_file( *gpu, filename );
-        Texture* texture = ( Texture* )textures.access_resource( index );
         texture->handle = handle;
-        texture->index = index;
         gpu->query_texture( handle, texture->desc );
 
         return texture;
@@ -275,12 +284,10 @@ Texture* Renderer::create_texture( cstring filename ) {
 }
 
 Sampler* Renderer::create_sampler( const SamplerCreation& creation ) {
-    u32 index = samplers.obtain_resource();
-    if ( index != k_invalid_index ) {
+    Sampler* sampler = samplers.obtain();
+    if ( sampler ) {
         SamplerHandle handle = gpu->create_sampler( creation );
-        Sampler* sampler = ( Sampler* )samplers.access_resource( index );
         sampler->handle = handle;
-        sampler->index = index;
         gpu->query_sampler( handle, sampler->desc );
 
         return sampler;
@@ -289,18 +296,16 @@ Sampler* Renderer::create_sampler( const SamplerCreation& creation ) {
 }
 
 RenderStage* Renderer::create_stage( const RenderStageCreation& creation ) {
-    u32 index = stages.obtain_resource();
-    if ( index != k_invalid_index ) {
-        RenderStage* stage = ( RenderStage* )stages.access_resource( index );
-
+    RenderStage* stage = stages.obtain();
+    if ( stage ) {
         // TODO: allocator
         stage->features.init( gpu->allocator, 1 );
-        stage->index = index;
         stage->name = creation.name;
         stage->type = creation.type;
         stage->resize = creation.resize;
         stage->clear = creation.clear;
         stage->num_render_targets = creation.num_render_targets;
+        stage->render_view = creation.render_view;
 
         for ( u32 i = 0; i < creation.num_render_targets; ++i ) {
             stage->output_textures[ i ] = creation.output_textures[ i ];
@@ -344,27 +349,23 @@ RenderStage* Renderer::create_stage( const RenderStageCreation& creation ) {
 }
 
 Shader* Renderer::create_shader( const ShaderCreation& creation ) {
-    u32 index = shaders.obtain_resource();
-    if ( index != k_invalid_index ) {
-        Shader* shader = ( Shader* )shaders.access_resource( index );
+    Shader* shader = shaders.obtain();
+    if ( shader ) {
         // Copy hfx header.
         shader->hfx_binary = creation.hfx_;
         shader->hfx_binary_v2 = creation.hfx_blueprint;
-        shader->index = index;
 
-        const u32 passes = shader->hfx_binary ? shader->hfx_binary->header->num_passes : shader->hfx_binary_v2->passes.size;
+        const u32 num_passes = shader->hfx_binary ? shader->hfx_binary->header->num_passes : shader->hfx_binary_v2->passes.size;
         // First create arrays
-        shader->pipelines.init( gpu->allocator, passes );
-        shader->pipelines.set_size( passes );
-        shader->resource_layouts.init( gpu->allocator, passes );
-        shader->resource_layouts.set_size( passes );
+        shader->passes.init( gpu->allocator, num_passes, num_passes );
         
-        if ( creation.num_outputs != passes ) {
+        if ( creation.num_outputs != num_passes ) {
             hy_assert( "Missing render outputs!" && false );
         }
 
-        for ( uint32_t i = 0; i < passes; ++i ) {
-            pipeline_create( *gpu, creation.hfx_, creation.hfx_blueprint, i, creation.outputs[ i ], shader->pipelines[ i ], &shader->resource_layouts[ i ], 1 );
+        for ( uint32_t i = 0; i < num_passes; ++i ) {
+            ShaderPass& pass = shader->passes[ i ];
+            pipeline_create( *gpu, creation.hfx_, creation.hfx_blueprint, i, creation.outputs[ i ], pass.pipeline, &pass.resource_layout, 1 );
         }
         return shader;
     }
@@ -377,31 +378,27 @@ Shader* Renderer::create_shader( hfx::ShaderEffectBlueprint* hfx, RenderPassOutp
 }
 
 Material* Renderer::create_material( const MaterialCreation& creation ) {
-    u32 index = materials.obtain_resource();
-    if ( index != k_invalid_index ) {
-        Material* mat = ( Material* )materials.access_resource( index );
-        mat->index = index;
-        mat->shader = creation.shader;
-        mat->num_passes = mat->shader->get_num_passes();
+    Material* material = materials.obtain();
+    if ( material ) {
+        material->shader = creation.shader;
+        
+        u32 num_passes = material->shader->get_num_passes();
         // First create arrays
-        mat->pipelines.init( gpu->allocator, mat->num_passes );
-        mat->pipelines.set_size( mat->num_passes );
-        mat->resource_lists.init( gpu->allocator, mat->num_passes );
-        mat->resource_lists.set_size( mat->num_passes );
-        mat->compute_dispatches.init( gpu->allocator, mat->num_passes);
-        mat->compute_dispatches.set_size( mat->num_passes );
-
+        material->passes.init( gpu->allocator, num_passes, num_passes );
+        
         // Cache pipelines and resources
-        for ( uint32_t i = 0; i < mat->num_passes; ++i ) {
-            mat->pipelines[ i ] = mat->shader->pipelines[ i ];
+        for ( uint32_t i = 0; i < num_passes; ++i ) {
+            MaterialPass& pass = material->passes[ i ];
+            ShaderPass& shader_pass = material->shader->passes[ i ];
+            pass.pipeline = shader_pass.pipeline;
             // Set layout internally
-            creation.resource_lists[ i ].set_layout( mat->shader->resource_layouts[ i ] );
-            mat->resource_lists[ i ] = gpu->create_resource_list( creation.resource_lists[ i ] );
+            creation.resource_lists[ i ].set_layout( shader_pass.resource_layout );
+            pass.resource_list = gpu->create_resource_list( creation.resource_lists[ i ] );
 
-            mat->shader->get_compute_dispatches( i, mat->compute_dispatches[ i ] );
+            material->shader->get_compute_dispatches( i, pass.compute_dispatch );
         }
 
-        return mat;
+        return material;
     }
     return nullptr;
 }
@@ -411,19 +408,35 @@ Material* Renderer::create_material( Shader* shader, ResourceListCreation* resou
     return create_material( creation );
 }
 
+RenderView* Renderer::create_render_view( Camera* camera, cstring name, u32 width_, u32 height_, RenderStage** stages_, u32 num_stages ) {
+    RenderView* render_view = render_views.obtain();
+
+    render_view->camera = camera;
+    render_view->name = name;
+    render_view->width = u16( width_ );
+    render_view->height = u16( height_ );
+    render_view->dependant_render_stages.init( gpu->allocator, num_stages + 2, stages_ ? num_stages : 0 );
+
+    if ( stages_ ) {
+        memcpy( render_view->dependant_render_stages.data, stages_, num_stages * sizeof( RenderStage* ) );
+    }
+
+    return render_view;
+}
+
 void Renderer::destroy_buffer( Buffer* buffer ) {
     gpu->destroy_buffer( buffer->handle );
-    buffers.release_resource( buffer->index );
+    buffers.release( buffer );
 }
 
 void Renderer::destroy_texture( Texture* texture ) {
     gpu->destroy_texture( texture->handle );
-    textures.release_resource( texture->index );
+    textures.release( texture );
 }
 
 void Renderer::destroy_sampler( Sampler* sampler ) {
     gpu->destroy_sampler( sampler->handle );
-    samplers.release_resource( sampler->index );
+    samplers.release( sampler );
 }
 
 void Renderer::destroy_stage( RenderStage* stage ) {
@@ -432,35 +445,40 @@ void Renderer::destroy_stage( RenderStage* stage ) {
 
     stage->features.shutdown();
 
-    stages.release_resource( stage->index );
+    stages.release( stage );
 }
 
 void Renderer::destroy_shader( Shader* shader ) {
     const u32 passes = shader->get_num_passes();
 
     for ( uint32_t i = 0; i < passes; ++i ) {
-        gpu->destroy_pipeline( shader->pipelines[ i ] );
-        gpu->destroy_resource_layout( shader->resource_layouts[ i ] );
+        ShaderPass& pass = shader->passes[ i ];
+        gpu->destroy_pipeline( pass.pipeline );
+        gpu->destroy_resource_layout( pass.resource_layout );
     }
 
-    shader->pipelines.shutdown();
-    shader->resource_layouts.shutdown();
+    shader->passes.shutdown();
 
     // TODO: this is handled externally.
     /*hfx::shader_effect_shutdown( shader->hfx_ );*/
-    shaders.release_resource( shader->index );
+    shaders.release( shader );
 }
 
 void Renderer::destroy_material( Material* material ) {
-    for ( uint32_t i = 0; i < material->num_passes; ++i ) {
-        gpu->destroy_resource_list( material->resource_lists[ i ] );
+    for ( uint32_t i = 0; i < material->passes.size; ++i ) {
+        MaterialPass& pass = material->passes[ i ];
+        gpu->destroy_resource_list( pass.resource_list );
     }
 
-    material->pipelines.shutdown();
-    material->resource_lists.shutdown();
-    material->compute_dispatches.shutdown();
+    material->passes.shutdown();
+    
+    materials.release( material );
+}
 
-    materials.release_resource( material->index );
+void Renderer::destroy_render_view( RenderView* render_view ) {
+    render_view->dependant_render_stages.shutdown();
+
+    render_views.release( render_view );
 }
 
 // TODO:
@@ -488,17 +506,17 @@ void Renderer::unmap_buffer( Buffer* buffer ) {
     }
 }
 
-void Renderer::resize( RenderStage* stage ) {
+void Renderer::resize_stage( RenderStage* stage, u32 new_width, u32 new_height ) {
 
     if ( !stage->resize.resize )
         return;
 
     if ( stage->type != RenderPassType::Swapchain ) {
-        gpu->resize_output_textures( stage->render_pass, width, height );
+        gpu->resize_output_textures( stage->render_pass, new_width, new_height );
     }
         
-    stage->output_width = roundu16( width * stage->resize.scale_x );
-    stage->output_height = roundu16( height * stage->resize.scale_y );
+    stage->output_width = roundu16( new_width * stage->resize.scale_x );
+    stage->output_height = roundu16( new_height * stage->resize.scale_y );
 
     // Update texture sizes
     for ( u32 i = 0; i < stage->num_render_targets; ++i ) {
@@ -510,24 +528,49 @@ void Renderer::resize( RenderStage* stage ) {
     }
 }
 
+void Renderer::resize_view( RenderView* view, u32 new_width, u32 new_height ) {
+    if ( new_width == view->width && new_height == view->height ) {
+        return;
+    }
+
+    view->width = new_width;
+    view->height = new_height;
+
+    if ( view->camera ) {
+        view->camera->set_viewport_size( new_width, new_height );
+        view->camera->set_aspect_ratio( new_width * 1.f / new_height );
+    }
+
+    for ( u32 is = 0; is < view->dependant_render_stages.size; ++is ) {
+        RenderStage* stage = view->dependant_render_stages[ is ];
+        if ( stage->render_view != view ) {
+            continue;
+        }
+
+        resize_stage( stage, new_width, new_height );
+    }
+}
+
 void Renderer::draw_material( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_commands, Material* material, u32 pass_index ) {
 
     gpu_commands->push_marker( stage->name );
 
+    MaterialPass& pass = material->passes[ pass_index ];
+
     switch ( stage->type ) {
-        case RenderPassType::Standard:
+        case RenderPassType::Geometry:
         {
             stage->barrier.set( PipelineStage::FragmentShader, PipelineStage::RenderTarget );
             gpu_commands->barrier( stage->barrier );
 
-            stage->clear.bind( sort_key, gpu_commands );
+            stage->clear.set( sort_key, gpu_commands );
 
             gpu_commands->bind_pass( sort_key++, stage->render_pass );
             gpu_commands->set_scissor( sort_key++, nullptr );
             gpu_commands->set_viewport( sort_key++, nullptr );
             // Fullscreen tri
-            gpu_commands->bind_pipeline( sort_key++, material->pipelines[ pass_index ] );
-            gpu_commands->bind_resource_list( sort_key++, &material->resource_lists[ pass_index ], 1, 0, 0 );
+            gpu_commands->bind_pipeline( sort_key++, pass.pipeline );
+            gpu_commands->bind_resource_list( sort_key++, &pass.resource_list, 1, 0, 0 );
             gpu_commands->draw( sort_key++, TopologyType::Triangle, 0, 3, 0, 1 );
 
             stage->barrier.set( PipelineStage::RenderTarget, PipelineStage::FragmentShader );
@@ -542,10 +585,10 @@ void Renderer::draw_material( RenderStage* stage, u64& sort_key, CommandBuffer* 
             gpu_commands->barrier( stage->barrier );
 
             gpu_commands->bind_pass( sort_key++, stage->render_pass );
-            gpu_commands->bind_pipeline( sort_key++, material->pipelines[ pass_index ] );
-            gpu_commands->bind_resource_list( sort_key++, &material->resource_lists[ pass_index ], 1, 0, 0 );
+            gpu_commands->bind_pipeline( sort_key++, pass.pipeline );
+            gpu_commands->bind_resource_list( sort_key++, &pass.resource_list, 1, 0, 0 );
 
-            const ComputeDispatch& dispatch = material->compute_dispatches[ pass_index ];
+            const ComputeDispatch& dispatch = pass.compute_dispatch;
             gpu_commands->dispatch( sort_key++, ceilu32( stage->output_width * 1.f / dispatch.x ), ceilu32( stage->output_height * 1.f / dispatch.y ), ceilu32( stage->output_depth * 1.f / dispatch.z ) );
 
             stage->barrier.set( PipelineStage::ComputeShader, PipelineStage::FragmentShader );
@@ -555,14 +598,14 @@ void Renderer::draw_material( RenderStage* stage, u64& sort_key, CommandBuffer* 
 
         case RenderPassType::Swapchain:
         {
-            stage->clear.bind( sort_key, gpu_commands );
+            stage->clear.set( sort_key, gpu_commands );
 
             gpu_commands->bind_pass( sort_key++, gpu->get_swapchain_pass() );
             gpu_commands->set_scissor( sort_key++, nullptr );
             gpu_commands->set_viewport( sort_key++, nullptr );
 
-            gpu_commands->bind_pipeline( sort_key++, material->pipelines[ pass_index ] );
-            gpu_commands->bind_resource_list( sort_key++, &material->resource_lists[ pass_index ], 1, 0, 0 );
+            gpu_commands->bind_pipeline( sort_key++, pass.pipeline );
+            gpu_commands->bind_resource_list( sort_key++, &pass.resource_list, 1, 0, 0 );
             gpu_commands->draw( sort_key++, TopologyType::Triangle, 0, 3, 0, 1 );
 
             break;
@@ -578,12 +621,12 @@ void Renderer::draw( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_comma
     gpu_commands->push_marker( stage->name );
 
     switch ( stage->type ) {
-        case RenderPassType::Standard:
+        case RenderPassType::Geometry:
         {
             stage->barrier.set( PipelineStage::FragmentShader, PipelineStage::RenderTarget );
             gpu_commands->barrier( stage->barrier );
 
-            stage->clear.bind( sort_key, gpu_commands );
+            stage->clear.set( sort_key, gpu_commands );
 
             gpu_commands->bind_pass( sort_key++, stage->render_pass );
             gpu_commands->set_scissor( sort_key++, nullptr );
@@ -592,12 +635,12 @@ void Renderer::draw( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_comma
             const u32 features_count = stage->features.size;
             if ( features_count ) {
                 for ( u32 i = 0; i < features_count; ++i ) {
-                    stage->features[ i ]->render( *this, sort_key, gpu_commands );
+                    stage->features[ i ]->render( *this, sort_key, gpu_commands, *stage->render_view );
                 }
             }
 
             if ( features_count == 0 ) {
-                hprint( "Error: trying to render a stage with 0 features. Nothing will be rendered." );
+                hprint( "Error: trying to render a stage with 0 features. Nothing will be rendered.\n" );
             }
 
             stage->barrier.set( PipelineStage::RenderTarget, PipelineStage::FragmentShader );
@@ -623,14 +666,16 @@ void Renderer::draw( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_comma
 
         case RenderPassType::Swapchain:
         {
-            stage->clear.bind( sort_key, gpu_commands );
+            stage->clear.set( sort_key, gpu_commands );
 
             gpu_commands->bind_pass( sort_key++, gpu->get_swapchain_pass() );
+            gpu_commands->set_scissor( sort_key++, nullptr );
+            gpu_commands->set_viewport( sort_key++, nullptr );
 
             const u32 features_count = stage->features.size;
             if ( features_count ) {
                 for ( u32 i = 0; i < features_count; ++i ) {
-                    stage->features[ i ]->render( *this, sort_key, gpu_commands );
+                    stage->features[ i ]->render( *this, sort_key, gpu_commands, *stage->render_view );
                 }
             }
             break;
@@ -642,8 +687,8 @@ void Renderer::draw( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_comma
 
 void Renderer::reload_resource_list( Material* material, u32 index ) {
 
-    ResourceListUpdate u;
-    u.resource_list = material->resource_lists[ index ];
+    //ResourceListUpdate u;
+    //u.resource_list = material->resource_lists[ index ];
     // TODO:
     //gpu->update_resource_list_instant( u );
 }
@@ -678,13 +723,18 @@ RenderStageCreation& RenderStageCreation::set_scaling( f32 scale_x_, f32 scale_y
     return *this;
 }
 
-RenderStageCreation& RenderStageCreation::set_name( const char* name_ ) {
+RenderStageCreation& RenderStageCreation::set_name( cstring name_ ) {
     name = name_;
     return *this;
 }
 
 RenderStageCreation& RenderStageCreation::set_type( RenderPassType::Enum type_ ) {
     type = type_;
+    return *this;
+}
+
+RenderStageCreation& RenderStageCreation::set_render_view( RenderView* view ) {
+    render_view = view;
     return *this;
 }
 
@@ -829,7 +879,7 @@ void GPUProfiler::update( Device& gpu ) {
     }
 }
 
-void GPUProfiler::draw_ui() {
+void GPUProfiler::imgui_draw() {
     if ( initial_frames_paused ) {
         return;
     }

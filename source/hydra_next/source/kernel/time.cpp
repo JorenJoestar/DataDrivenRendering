@@ -20,7 +20,7 @@ void time_service_init() {
 
 //
 //
-void time_service_terminate() {
+void time_service_shutdown() {
     // Nothing to do.
 }
 

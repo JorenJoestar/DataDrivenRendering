@@ -74,9 +74,10 @@ void DebugRenderer::render( hydra::gfx::Renderer& renderer, hydra::gfx::CommandB
             renderer.unmap_buffer( lines_vb );
         }
         u64 sort_key = 0;
-        gpu_commands->bind_pipeline( sort_key++, material->pipelines[0] );
+        MaterialPass& pass = material->passes[ 0 ];
+        gpu_commands->bind_pipeline( sort_key++, pass.pipeline );
         gpu_commands->bind_vertex_buffer( sort_key++, lines_vb->handle, 0, 0 );
-        gpu_commands->bind_resource_list( sort_key++, &material->resource_lists[0], 1, nullptr, 0 );
+        gpu_commands->bind_resource_list( sort_key++, &pass.resource_list, 1, nullptr, 0 );
         // Draw using instancing and 6 vertices.
         const uint32_t num_vertices = 6;
         gpu_commands->draw( sort_key++, TopologyType::Triangle, 0, num_vertices, 0, current_line / 2 );

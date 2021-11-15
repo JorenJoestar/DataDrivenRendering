@@ -71,7 +71,7 @@ void imgui_walker( void* ptr, size_t size, int used, void* user ) {
 }
 
 #if defined HYDRA_IMGUI
-void MemoryService::debug_ui() {
+void MemoryService::imgui_draw() {
 
     if ( ImGui::Begin( "Memory Service" ) ) {
 
@@ -83,26 +83,26 @@ void MemoryService::debug_ui() {
 
 void MemoryService::test() {
 
-    static u8 mem[ 1024 ];
-    LinearAllocator la;
-    la.init( mem, 1024 );
+    //static u8 mem[ 1024 ];
+    //LinearAllocator la;
+    //la.init( mem, 1024 );
 
-    // Allocate 3 times
-    void* a1 = halloca( 16, &la );
-    void* a2 = halloca( 20, &la );
-    void* a4 = halloca( 10, &la );
-    // Free based on size
-    la.free( 10 );
-    void* a3 = halloca( 10, &la );
-    hy_assert( a3 == a4 );
+    //// Allocate 3 times
+    //void* a1 = halloca( 16, &la );
+    //void* a2 = halloca( 20, &la );
+    //void* a4 = halloca( 10, &la );
+    //// Free based on size
+    //la.free( 10 );
+    //void* a3 = halloca( 10, &la );
+    //hy_assert( a3 == a4 );
 
-    // Free based on pointer
-    hfree( a2, &la );
-    void* a32 = halloca( 10, &la );
-    hy_assert( a32 == a2 );
-    // Test out of bounds 
-    u8* out_bounds = ( u8* )a1 + 10000;
-    hfree( out_bounds, &la );
+    //// Free based on pointer
+    //hfree( a2, &la );
+    //void* a32 = halloca( 10, &la );
+    //hy_assert( a32 == a2 );
+    //// Test out of bounds 
+    //u8* out_bounds = ( u8* )a1 + 10000;
+    //hfree( out_bounds, &la );
 }
 
 // Memory Structs /////////////////////////////////////////////////////////
@@ -201,16 +201,16 @@ void HeapAllocator::deallocate( void* pointer ) {
 LinearAllocator::~LinearAllocator() {
 }
 
-void LinearAllocator::init( void* static_memory, sizet size ) {
-    hy_assert( static_memory && size );
+void LinearAllocator::init( sizet size ) {
 
-    memory = ( u8* )static_memory;
+    memory = ( u8* )malloc( size );
     total_size = size;
     allocated_size = 0;
 }
 
 void LinearAllocator::shutdown() {
-    free_all();
+    clear();
+    free( memory );
 }
 
 void* LinearAllocator::allocate( sizet size, sizet alignment ) {
@@ -232,24 +232,11 @@ void* LinearAllocator::allocate( sizet size, sizet alignment, cstring file, i32 
     return allocate( size, alignment );
 }
 
-void LinearAllocator::deallocate( void* pointer ) {
-    hy_assert( pointer >= memory );
-    hy_assertm( pointer < memory + total_size, "Out of bound free on linear allocator (outside bounds). Tempting to free %p, %llu after beginning of buffer (memory %p size %llu, allocated %llu)", (u8*)pointer, ( u8* )pointer - memory, memory, total_size, allocated_size );
-    hy_assertm( pointer < memory + allocated_size, "Out of bound free on linear allocator (inside bounds, after allocated). Tempting to free %p, %llu after beginning of buffer (memory %p size %llu, allocated %llu)", ( u8* )pointer, ( u8* )pointer - memory, memory, total_size, allocated_size );
-
-    const sizet size_at_pointer = ( u8* )pointer - memory;
-
-    allocated_size = size_at_pointer;
+void LinearAllocator::deallocate( void*  ) {
+    // This allocator does not allocate on a per-pointer base!
 }
 
-void LinearAllocator::free( sizet size ) {
-    hy_assert( size < total_size );
-    hy_assert( size < allocated_size );
-
-    allocated_size -= size;
-}
-
-void LinearAllocator::free_all() {
+void LinearAllocator::clear() {
     allocated_size = 0;
 }
 

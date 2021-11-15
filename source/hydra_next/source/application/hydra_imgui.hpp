@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// Hydra ImGUI - v0.13
+// Hydra ImGUI - v0.15
 //
 // ImGUI wrapper using Hydra Graphics.
 //
@@ -9,6 +9,8 @@
 //
 //      Created         : 2019/09/16, 19.23
 //
+//      0.15 (2021/11/10): + Finished fully functional bindless support, using instance id to retrieve texture in the bindless texture.
+//      0.14 (2021/11/10): + Added custom ImGui styles.
 //      0.13 (2021/10/28): + Added initial support for bindless rendering.
 //      0.12 (2021/10/27): + Added support for Vertex and Index offsets in ImGui rendering.
 //      0.11 (2021/10/21): + Changed ImGuiService to use Renderer instead of GpuDevice.
@@ -40,6 +42,15 @@ namespace hydra {
 
     //
     //
+    enum ImGuiStyles {
+        Default = 0,
+        GreenBlue,
+        DarkRed,
+        DarkGold
+    }; // enum ImGuiStyles
+
+    //
+    //
     struct ImGuiService : public Service {
 
         hy_declare_service( ImGuiService );
@@ -50,26 +61,26 @@ namespace hydra {
         void                            new_frame( void* window_handle );
         void                            render( hydra::gfx::Renderer* renderer, hydra::gfx::CommandBuffer& commands );
 
+        // Removes the Texture from the Cache and destroy the associated Resource List.
+        void                            remove_cached_texture( hydra::gfx::TextureHandle& texture );
+
+        //void                          imgui_on_resize( hydra::gfx::Device& gpu, uint32_t width, uint32_t height );
+
+        void                            set_style( ImGuiStyles style );
+
         hydra::gfx::Renderer*           gfx;
 
         static constexpr cstring        k_name = "hydra_imgui_service";
 
     }; // ImGuiService
 
-
-    void                                imgui_on_resize( hydra::gfx::Device& gpu, uint32_t width, uint32_t height );
-
-    // Removes the Texture from the Cache and destroy the associated Resource List.
-    void                                imgui_remove_cached_texture( hydra::gfx::Device& gpu, hydra::gfx::TextureHandle& texture );
-
-
     // File Dialog /////////////////////////////////////////////////////////
 
-    bool                                imgui_file_dialog_open( const char* button_name, const char* path, const char* extension );
+    /*bool                                imgui_file_dialog_open( const char* button_name, const char* path, const char* extension );
     const char*                         imgui_file_dialog_get_filename();
 
     bool                                imgui_path_dialog_open( const char* button_name, const char* path );
-    const char*                         imgui_path_dialog_get_path();
+    const char*                         imgui_path_dialog_get_path();*/
 
     // Application Log /////////////////////////////////////////////////////
 

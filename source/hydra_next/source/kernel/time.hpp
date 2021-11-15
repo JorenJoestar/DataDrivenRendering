@@ -5,7 +5,7 @@
 namespace hydra {
 
     void                            time_service_init();                // Needs to be called once at startup.
-    void                            time_service_terminate();           // Needs to be called at shutdown.
+    void                            time_service_shutdown();           // Needs to be called at shutdown.
 
     i64                             time_now();                         // Get current time ticks.
 

@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// Hydra Lib - v0.30
+// Hydra Lib - v0.33
 //
 // Header to track different core libraries within Hydra framework.
 //
@@ -18,6 +18,10 @@
 //
 // Revision history //////////////////////
 //
+//      0.33 (2021/11/10): + Added index/string interface to StringBuffer.
+//                         + Fixed LinearAllocator as grow-only/clear-all allocator. It was the same as StackAllocator before.
+//      0.32 (2021/11/05): + Added serialize_memory_block to BlobSerializer to read/write blocks of memory easily.
+//      0.31 (2021/11/04): + Fixed hash map erase and get with iterator.
 //      0.30 (2021/10/22): + Fixed hash map iterator behaviour, added clear method.
 //                         + Added file_name_from_path to retrieve just the file name from a path.
 //                         + Added StringArray implementation based on FlatHashMap.

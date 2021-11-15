@@ -116,7 +116,7 @@ void hg04::create( const hydra::ApplicationConfiguration& configuration ) {
 
     // Stage Creation
     RenderStageCreation rsc;
-    rsc.reset().set_type( RenderPassType::Standard ).set_name( "forward" ).add_render_texture( main_texture ).set_depth_stencil_texture( main_depth );
+    rsc.reset().set_type( RenderPassType::Geometry ).set_name( "forward" ).add_render_texture( main_texture ).set_depth_stencil_texture( main_depth );
     rsc.clear.reset().set_depth( 1 );
     rsc.clear.color_operation = RenderPassOperation::Clear;
     forward_stage = gfx->create_stage( rsc );
@@ -201,7 +201,7 @@ bool hg04::main_loop() {
 
         // Handle resize
         if ( window->resized ) {
-            gfx->on_resize( window->width, window->height );
+            gfx->resize_swapchain( window->width, window->height );
             on_resize( window->width, window->height );
             window->resized = false;
         }
@@ -217,12 +217,12 @@ bool hg04::main_loop() {
         ImGui::End();
 
         if ( ImGui::Begin( "GPU" ) ) {
-            gpu_profiler.draw_ui();
+            gpu_profiler.imgui_draw();
 
         }
         ImGui::End();
 
-        hydra::MemoryService::instance()->debug_ui();
+        hydra::MemoryService::instance()->imgui_draw();
 
         
         main_camera.update();
@@ -259,7 +259,7 @@ bool hg04::main_loop() {
         sprite.albedo_id = nightmare_sprite_texture->handle.index;
 
         sprite_batch.begin( *gfx, main_camera );
-        sprite_batch.set( nightmare_sprite_material->pipelines[ 0 ], nightmare_sprite_material->resource_lists[ 0 ] );
+        sprite_batch.set( nightmare_sprite_material->passes[ 0 ] );
         sprite_batch.add( sprite );
         sprite_batch.end( *gfx );
 
@@ -283,8 +283,8 @@ bool hg04::main_loop() {
         cb->pop_marker();
 
         // Compute gpu text dispatches
-        cb->bind_pipeline( sort_key++, debug_gpu_font_material->pipelines[ gpu_text::pass_calculate_dispatch ] );
-        cb->bind_resource_list( sort_key++, &debug_gpu_font_material->resource_lists[ gpu_text::pass_calculate_dispatch ], 1, 0, 0 );
+        cb->bind_pipeline( sort_key++, debug_gpu_font_material->passes[ gpu_text::pass_calculate_dispatch ].pipeline );
+        cb->bind_resource_list( sort_key++, &debug_gpu_font_material->passes[ gpu_text::pass_calculate_dispatch ].resource_list, 1, 0, 0 );
         // Still need to add buffers into per-stage barrier, so do it manually.
         hydra::gfx::ExecutionBarrier barrier;
         barrier.reset().add_memory_barrier( { debug_gpu_font_indirect_buffer->handle } );
@@ -293,7 +293,7 @@ bool hg04::main_loop() {
 
         cb->barrier( barrier );
         cb->bind_pass( sort_key++, gpu_font_dispatch_stage->render_pass );
-        const hydra::gfx::ComputeDispatch& dispatch = debug_gpu_font_material->compute_dispatches[ gpu_text::pass_calculate_dispatch ];
+        const hydra::gfx::ComputeDispatch& dispatch = debug_gpu_font_material->passes[ gpu_text::pass_calculate_dispatch ].compute_dispatch;
         // Dispatch!
         cb->dispatch( sort_key++, hydra::ceilu32( 1.f / dispatch.x ), hydra::ceilu32( 1.f / dispatch.y ), hydra::ceilu32( 1.f / dispatch.z ) );
         // Barrier reverse: it will be used for draw indirect.
@@ -306,9 +306,9 @@ bool hg04::main_loop() {
         cb->push_marker( "Apply Main" );
         cb->barrier( forward_stage->barrier.set( hydra::gfx::PipelineStage::RenderTarget, hydra::gfx::PipelineStage::FragmentShader ) );
         cb->bind_pass( sort_key++, gfx->gpu->swapchain_pass );
-        
-        cb->bind_pipeline( sort_key++, debug_gpu_font_material->pipelines[ gpu_text::pass_through ] );
-        cb->bind_resource_list( sort_key++, &debug_gpu_font_material->resource_lists[ gpu_text::pass_through ], 1, 0, 0 );
+
+        cb->bind_pipeline( sort_key++, debug_gpu_font_material->passes[ gpu_text::pass_through ].pipeline );
+        cb->bind_resource_list( sort_key++, &debug_gpu_font_material->passes[ gpu_text::pass_through ].resource_list, 1, 0, 0 );
         // Use first_instance to retrieve texture ID for bindless use.
         cb->draw( sort_key++, hydra::gfx::TopologyType::Triangle, 0, 3, main_texture->handle.index, 1 );
         cb->pop_marker();
@@ -316,13 +316,13 @@ bool hg04::main_loop() {
         // Draw fullscreen debug text or sprite based
         cb->push_marker( "Write GPU text" );
         if ( s_use_fullscreen_gpu_font ) {
-            cb->bind_pipeline( sort_key++, debug_gpu_font_material->pipelines[ gpu_text::pass_fullscreen ] );
-            cb->bind_resource_list( sort_key++, &debug_gpu_font_material->resource_lists[ gpu_text::pass_fullscreen ], 1, 0, 0 );
+            cb->bind_pipeline( sort_key++, debug_gpu_font_material->passes[ gpu_text::pass_fullscreen ].pipeline );
+            cb->bind_resource_list( sort_key++, &debug_gpu_font_material->passes[ gpu_text::pass_fullscreen ].resource_list, 1, 0, 0 );
             cb->draw( sort_key++, hydra::gfx::TopologyType::Triangle, 0, 3, 0, 1 );
         }
         else {
-            cb->bind_pipeline( sort_key++, debug_gpu_font_material->pipelines[ gpu_text::pass_sprite ] );
-            cb->bind_resource_list( sort_key++, &debug_gpu_font_material->resource_lists[ gpu_text::pass_sprite ], 1, 0, 0 );
+            cb->bind_pipeline( sort_key++, debug_gpu_font_material->passes[ gpu_text::pass_sprite ].pipeline );
+            cb->bind_resource_list( sort_key++, &debug_gpu_font_material->passes[ gpu_text::pass_sprite ].resource_list, 1, 0, 0 );
             cb->draw_indirect( sort_key++, debug_gpu_font_indirect_buffer->handle, 0, sizeof( u32 ) * 4 );
         }
         cb->pop_marker();

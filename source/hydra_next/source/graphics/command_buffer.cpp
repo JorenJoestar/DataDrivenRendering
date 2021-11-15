@@ -132,6 +132,12 @@ void CommandBuffer::bind_resource_list( uint64_t sort_key, ResourceListHandle* h
     const uint32_t k_first_set = 0;
     vkCmdBindDescriptorSets( vk_command_buffer, current_pipeline->vk_bind_point, current_pipeline->vk_pipeline_layout, k_first_set,
                              num_lists, vk_descriptor_sets, num_offsets, offsets_cache );
+
+    if ( device->bindless_supported ) {
+        vkCmdBindDescriptorSets( vk_command_buffer, current_pipeline->vk_bind_point, current_pipeline->vk_pipeline_layout, 1,
+                                 1, &device->vulkan_bindless_descriptor_set, 0, nullptr );
+    }
+    
 }
 
 void CommandBuffer::set_viewport( uint64_t sort_key, const Viewport* viewport ) {

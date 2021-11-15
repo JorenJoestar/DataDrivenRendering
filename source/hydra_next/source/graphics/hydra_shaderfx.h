@@ -1,6 +1,6 @@
 
 //
-// Hydra HFX v0.51
+// Hydra HFX v0.52
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
@@ -9,6 +9,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.52  (2021/11/07): + Added custom ResourceBinding class to store data inside hfx file. ResourceLayout was losing it after creation because was using temporary data.
 //      0.51  (2021/11/02): + Empowered generated code by adding table helper to fill ResourceListCreation.
 //      0.50  (2021/10/27): + Added generated c++ folder as hfx_compile parameter to control generated file output.
 //      0.49  (2021/10/25): + Fixed a reflection duplication bug coming from the generated json.
@@ -119,7 +120,6 @@ namespace hfx {
     typedef hydra::StringView                                   StringRef;
     typedef hydra::StringBuffer                                 StringBuffer;
     typedef hydra::gfx::ShaderStage::Enum                       Stage;
-    typedef hydra::gfx::ResourceLayoutCreation::Binding         ResourceBinding;
 
     enum PropertyType {
         Float, Int, Range, Color, Vector, Texture1D, Texture2D, Texture3D, TextureVolume, Unknown
@@ -132,6 +132,16 @@ namespace hfx {
         u16                             y = 0;
         u16                             z = 0;
     }; // struct ComputeDispatch
+
+    //
+    // Custom class that contains data for name.
+    struct ResourceBinding {
+
+        hydra::gfx::ResourceType::Enum  type = hydra::gfx::ResourceType::Constants;
+        u16                         start = 0;
+        u16                         count = 0;
+        char                        name[ 32 ];
+    }; // struct ResourceBinding
 
     // NEW VERSION ////////////////////////////////////////////////////////
     //

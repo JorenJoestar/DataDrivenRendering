@@ -485,7 +485,7 @@ namespace PipelineStage {
 namespace RenderPassType {
 
     enum Enum {
-        Standard, Swapchain, Compute
+        Geometry, Swapchain, Compute
     };
 } // namespace RenderPassType
 

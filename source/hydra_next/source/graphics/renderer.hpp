@@ -1,7 +1,6 @@
 #pragma once
 
-//
-//  Hydra Rendering - v0.38
+//  Hydra Rendering - v0.42
 //
 //  High level rendering implementation based on Hydra Graphics library.
 //
@@ -11,10 +10,15 @@
 //
 // Files /////////////////////////////////
 //
-// camera.hpp/.cpp, debug_renderer.hpp/.cpp, renderer.hpp/.cpp, sprite_batch.hpp/.cpp
+// camera.hpp/.cpp, debug_renderer.hpp/.cpp, renderer.hpp/.cpp, render_graph.hpp/.cpp, sprite_batch.hpp/.cpp
 //
 // Revision history //////////////////////
 //
+//      0.42 (2021/11/14): + Added render view resize. Added renderview to stage creation.
+//      0.41 (2021/11/11): + Added initial RenderGraph implementation.
+//      0.40 (2021/11/10): + Added RenderView as bridge between camera, objects and render stages.
+//                         + Converted Renderer to use ResourcePoolTyped.
+//      0.39 (2021/11/07): + Added ShaderPass and MaterialPass to remove too many arrays in Shaders and Materials.
 //      0.38 (2021/10/23): + Added buffer, shader and material new creation methods with just parameter for convenience.
 //      0.37 (2021/10/21): + Added methods to remove the need to access GPUDevice directly.
 //      0.36 (2021/09/29): + Added support for HFX version 2. + Some code cleanup.
@@ -75,9 +79,13 @@ namespace gfx {
 
 // General methods //////////////////////////////////////////////////////////////
 
-struct RenderFeature;
+
+struct Camera;
 struct ClearData;
 struct Renderer;
+struct RenderFeature;
+struct RenderStage;
+struct RenderView;
 
 //
 // Color class that embeds color in a uint32.
@@ -86,10 +94,15 @@ struct ColorUint {
     uint32_t                        abgr;
 
     void                            set( float r, float g, float b, float a )               { abgr = uint8_t( r * 255.f ) | (uint8_t( g * 255.f ) << 8) | (uint8_t( b * 255.f ) << 16) | (uint8_t( a * 255.f ) << 24); }
+    f32                             r() const                                               { return (abgr & 0xff) / 255.f; }
+    f32                             g() const                                               { return ((abgr >> 8) & 0xff) / 255.f; }
+    f32                             b() const                                               { return ((abgr >> 16) & 0xff) / 255.f; }
+    f32                             a() const                                               { return ((abgr >> 24) & 0xff) / 255.f; }
 
     ColorUint                       operator=(const u32 color) { abgr = color; }
 
     static uint32_t                 from_u8( uint8_t r, uint8_t g, uint8_t b, uint8_t a )   { return (r | (g << 8) | (b << 16) | (a << 24)); }
+
     static u32                      get_distinct_color( u32 index );
 
     static const uint32_t           red                                 = 0xff0000ff;
@@ -110,7 +123,7 @@ struct ColorUint {
 struct Buffer {
 
     BufferHandle                    handle;
-    u32                             index;      // Resource Pool Index
+    u32                             pool_index;
     BufferDescription               desc;
 
 }; // struct Buffer
@@ -120,7 +133,7 @@ struct Buffer {
 struct Sampler {
 
     SamplerHandle                   handle;
-    u32                             index;
+    u32                             pool_index;
     SamplerDescription              desc;
 
 }; // struct Sampler
@@ -132,7 +145,7 @@ struct Sampler {
 struct Texture {
 
     TextureHandle                   handle;
-    u32                             index;
+    u32                             pool_index;
     TextureDescription              desc;
 
 }; // struct Texture
@@ -164,31 +177,6 @@ struct TextureAtlas {
 }; // struct TextureAtlas
 
 
-// Material/Shaders /////////////////////////////////////////////////////////////
-
-//
-//
-struct ClearData {
-
-    // Draw utility
-    void                            bind( u64& sort_key, CommandBuffer* gpu_commands );
-
-    // Set methods
-    ClearData&                      reset();
-    // ClearData& set_color( vec4s color );
-    ClearData&                      set_depth( f32 depth );
-    ClearData&                      set_stencil( u8 stencil );
-
-    f32                             clear_color[4];
-    f32                             depth_value;
-    u8                              stencil_value;
-
-    RenderPassOperation::Enum       color_operation         = RenderPassOperation::DontCare;
-    RenderPassOperation::Enum       depth_operation         = RenderPassOperation::DontCare;
-    RenderPassOperation::Enum       stencil_operation       = RenderPassOperation::DontCare;
-
-}; // struct ClearData
-
 //
 //
 struct ComputeDispatch {
@@ -197,68 +185,7 @@ struct ComputeDispatch {
     u16                             z = 0;
 }; // struct ComputeDispatch
 
-//
-//
-struct ResizeData {
-
-    f32                             scale_x     = 1.f;
-    f32                             scale_y     = 1.f;
-    u8                              resize      = 1;
-};
-
-//
-//
-struct RenderStageCreation {
-
-    RenderStageCreation&            reset();
-
-    RenderStageCreation&            add_render_texture( Texture* texture );
-    RenderStageCreation&            set_depth_stencil_texture( Texture* texture );
-
-    RenderStageCreation&            set_scaling( f32 scale_x, f32 scale_y, u8 resize );
-    RenderStageCreation&            set_name( const char* name );
-    RenderStageCreation&            set_type( RenderPassType::Enum type );
-
-
-    ClearData                       clear;
-    ResizeData                      resize;
-
-    u16                             num_render_targets  = 0;
-    RenderPassType::Enum            type                = RenderPassType::Standard;
-
-    Texture*                        output_textures[k_max_image_outputs];
-    Texture*                        depth_stencil_texture;
-
-
-    const char*                     name                = nullptr;
-
-}; // RenderStageCreation
-
-//
-//
-struct RenderStage {
-
-    RenderPassOutput                output;
-    ExecutionBarrier                barrier;
-    ClearData                       clear;
-    ResizeData                      resize;
-    RenderPassHandle                render_pass;
-    RenderPassType::Enum            type;
-
-    Texture*                        output_textures[k_max_image_outputs];
-    Texture*                        depth_stencil_texture;
-
-    Array<RenderFeature*>           features;
-
-    cstring                         name;
-
-    u16                             num_render_targets = 0;
-    u32                             index;
-    u16                             output_width;
-    u16                             output_height;
-    u16                             output_depth;
-}; // struct RenderStage
-
+// Material/Shaders /////////////////////////////////////////////////////////////
 
 //
 //
@@ -279,6 +206,14 @@ struct ShaderCreation {
 
 //
 //
+struct ShaderPass {
+
+    PipelineHandle                  pipeline;
+    ResourceLayoutHandle            resource_layout;
+}; // struct ShaderPass
+
+//
+//
 struct Shader {
 
     void                            get_compute_dispatches( u32 pass_index, hydra::gfx::ComputeDispatch& out_dispatch );
@@ -287,10 +222,9 @@ struct Shader {
     hfx::ShaderEffectFile*          hfx_binary      = nullptr;
     hfx::ShaderEffectBlueprint*     hfx_binary_v2   = nullptr;
 
-    Array<PipelineHandle>           pipelines;
-    Array<ResourceLayoutHandle>     resource_layouts;
+    Array<ShaderPass>               passes;
 
-    u32                             index;
+    u32                             pool_index;
 
 }; // struct Shader
 
@@ -310,16 +244,23 @@ struct MaterialCreation {
 
 //
 //
+struct MaterialPass {
+
+    PipelineHandle                  pipeline;   // Cached from ShaderPass
+    ResourceListHandle              resource_list;
+    ComputeDispatch                 compute_dispatch;
+
+}; // struct MaterialPass
+
+//
+//
 struct Material {
     
     Shader*                         shader;
 
-    Array<PipelineHandle>           pipelines;      // Caches from ShaderEffect
-    Array<ResourceListHandle>       resource_lists;
-    Array<ComputeDispatch>          compute_dispatches;
+    Array<MaterialPass>             passes;
 
-    u32                             num_passes;
-    u32                             index;
+    u32                             pool_index;
 
 }; // struct Material
 
@@ -332,12 +273,120 @@ struct RenderFeature {
     virtual void                    unload_resources( Renderer& renderer, bool shutdown, bool reload ) { }
 
     virtual void                    update( Renderer& renderer, f32 delta_time ) { }
-    virtual void                    render( Renderer& renderer, u64& sort_key, CommandBuffer* commands ) { }
+    virtual void                    render( Renderer& renderer, u64& sort_key, CommandBuffer* commands, RenderView& render_view ) { }
 
-    virtual void                    resize( Renderer& renderer, u32 width, u32 height ) {}
+    virtual void                    resize( Renderer& renderer, RenderView& render_view ) {}
 
 }; // struct RenderFeature
 
+// Render Stage /////////////////////////////////////////////////////////////////
+
+//
+// A RenderView is a combination of a Camera and all the stages and objects visible
+// from that camera.
+// It guides resizing chains and in practice gives a sectorization of rendering.
+//
+struct RenderView {
+
+    Camera*                         camera      = nullptr;
+    cstring                         name        = nullptr;
+
+    Array<RenderStage*>             dependant_render_stages;
+
+    u16                             width       = 1;
+    u16                             height      = 1;
+
+    u32                             pool_index  = 0;
+
+}; // struct RenderView
+
+//
+//
+struct ClearData {
+
+    // Draw utility
+    void                            set( u64& sort_key, CommandBuffer* gpu_commands );
+
+    // Set methods
+    ClearData&                      reset();
+    ClearData&                      set_color( vec4s color );
+    ClearData&                      set_color( ColorUint color );
+    ClearData&                      set_depth( f32 depth );
+    ClearData&                      set_stencil( u8 stencil );
+
+    f32                             clear_color[4];
+    f32                             depth_value;
+    u8                              stencil_value;
+
+    RenderPassOperation::Enum       color_operation         = RenderPassOperation::DontCare;
+    RenderPassOperation::Enum       depth_operation         = RenderPassOperation::DontCare;
+    RenderPassOperation::Enum       stencil_operation       = RenderPassOperation::DontCare;
+
+}; // struct ClearData
+
+//
+//
+struct ResizeData {
+
+    f32                             scale_x     = 1.f;
+    f32                             scale_y     = 1.f;
+    u8                              resize      = 1;
+};
+
+//
+//
+struct RenderStageCreation {
+
+    RenderStageCreation&            reset();
+
+    RenderStageCreation&            add_render_texture( Texture* texture );
+    RenderStageCreation&            set_depth_stencil_texture( Texture* texture );
+
+    RenderStageCreation&            set_scaling( f32 scale_x, f32 scale_y, u8 resize );
+    RenderStageCreation&            set_name( cstring name );
+    RenderStageCreation&            set_type( RenderPassType::Enum type );
+    RenderStageCreation&            set_render_view( RenderView* view );
+
+
+    ClearData                       clear;
+    ResizeData                      resize;
+
+    u16                             num_render_targets  = 0;
+    RenderPassType::Enum            type                = RenderPassType::Geometry;
+
+    Texture*                        output_textures[k_max_image_outputs];
+    Texture*                        depth_stencil_texture;
+    RenderView*                     render_view;
+
+    cstring                         name                = nullptr;
+
+}; // RenderStageCreation
+
+//
+//
+struct RenderStage {
+
+    RenderPassOutput                output;
+    ExecutionBarrier                barrier;
+    ClearData                       clear;
+    ResizeData                      resize;
+    RenderPassHandle                render_pass;
+    RenderPassType::Enum            type;
+
+    Texture*                        output_textures[k_max_image_outputs];
+    Texture*                        depth_stencil_texture;
+
+    RenderView*                     render_view;
+    Array<RenderFeature*>           features;
+
+    cstring                         name;
+
+    u16                             num_render_targets = 0;
+    u32                             pool_index;
+    u16                             output_width;
+    u16                             output_height;
+    u16                             output_depth;
+}; // struct RenderStage
 
 // Utils ////////////////////////////////////////////////////////////////////////
 
@@ -364,7 +413,7 @@ struct Renderer : public Service {
     void                        begin_frame();
     void                        end_frame();
 
-    void                        on_resize( u32 width, u32 height );
+    void                        resize_swapchain( u32 width, u32 height );
 
     f32                         aspect_ratio() const;
 
@@ -385,18 +434,23 @@ struct Renderer : public Service {
     Material*                   create_material( const MaterialCreation& creation );
     Material*                   create_material( Shader* shader, ResourceListCreation* resource_lists, u32 num_lists );
 
+    RenderView*                 create_render_view( Camera* camera, cstring name, u32 width, u32 height, RenderStage** stages, u32 num_stages );
+
     void                        destroy_buffer( Buffer* buffer );
     void                        destroy_texture( Texture* texture );
     void                        destroy_sampler( Sampler* sampler );
     void                        destroy_stage( RenderStage* stage );
     void                        destroy_shader( Shader* shader );
     void                        destroy_material( Material* material );
+    void                        destroy_render_view( RenderView* render_view );
 
     // Update resources
     void*                       map_buffer( Buffer* buffer, u32 offset = 0, u32 size = 0 );
     void                        unmap_buffer( Buffer* buffer );
 
-    void                        resize( RenderStage* stage );
+    void                        resize_stage( RenderStage* stage, u32 new_width, u32 new_height );
+    void                        resize_view( RenderView* view, u32 new_width, u32 new_height );
+
     void                        reload_resource_list( Material* material, u32 index );
 
     CommandBuffer*              get_command_buffer( QueueType::Enum type, bool begin )  { return gpu->get_command_buffer( type, begin ); }
@@ -408,12 +462,13 @@ struct Renderer : public Service {
     void                        draw_material( RenderStage* stage, u64& sort_key, CommandBuffer* gpu_commands,
                                                Material* material, u32 material_pass_index );           // Draw using materials
     
-    ResourcePool                textures;
-    ResourcePool                buffers;
-    ResourcePool                samplers;
-    ResourcePool                stages;
-    ResourcePool                shaders;
-    ResourcePool                materials;
+    ResourcePoolTyped<Texture>  textures;
+    ResourcePoolTyped<Buffer>   buffers;
+    ResourcePoolTyped<Sampler>  samplers;
+    ResourcePoolTyped<RenderStage> stages;
+    ResourcePoolTyped<Shader>   shaders;
+    ResourcePoolTyped<Material> materials;
+    ResourcePoolTyped<RenderView> render_views;
 
     hydra::gfx::Device*         gpu;
 
@@ -433,7 +488,7 @@ struct GPUProfiler {
 
     void                        update( Device& gpu );
 
-    void                        draw_ui();
+    void                        imgui_draw();
 
     Allocator*                  allocator;
     GPUTimestamp*               timestamps;

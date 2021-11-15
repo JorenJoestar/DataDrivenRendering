@@ -177,6 +177,22 @@ char* StringBuffer::append_use_substring( const char* string, u32 start_index, u
     return this->data + cached_offset;
 }
 
+void StringBuffer::close_current_string() {
+    data[ current_size ] = 0;
+    ++current_size;
+}
+
+u32 StringBuffer::get_index( cstring text ) const {
+    u64 text_distance = text - data;
+    // TODO: how to handle an error here ?
+    return text_distance < buffer_size ? u32( text_distance ) : u32_max;
+}
+
+cstring StringBuffer::get_text( u32 index ) const {
+    // TODO: how to handle an error here ?
+    return index < buffer_size ? cstring(data + index) : nullptr;
+}
+
 char* StringBuffer::reserve( sizet size ) {
     if ( current_size + size >= buffer_size )
         return nullptr;
@@ -219,8 +235,8 @@ void StringArray::shutdown() {
 
 void StringArray::clear() {
     current_size = 0;
-    hy_assertm( false, "Need to implement hash map free/clear method first!\n" );
-    //string_to_index->
+    
+    string_to_index->clear();
 }
 
 FlatHashMapIterator* StringArray::begin_string_iteration() {

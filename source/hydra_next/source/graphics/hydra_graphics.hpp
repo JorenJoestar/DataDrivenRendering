@@ -1,7 +1,7 @@
 #pragma once
 
 //
-//  Hydra Graphics - v0.45
+//  Hydra Graphics - v0.48
 //  3D API wrapper around Vulkan/Direct3D12/OpenGL.
 //  Mostly based on the amazing Sokol library (https://github.com/floooh/sokol), but with a different target (wrapping Vulkan/Direct3D12).
 //
@@ -16,6 +16,10 @@
 //
 // Revision history //////////////////////
 //
+//      0.48  (2021/11/15): + Handled update after bind for bindless descriptor set layout. + Added deferred bindless textures descriptors update, and batched them.
+//      0.47  (2021/11/07): + Changed ResourceLayoutCreation::Binding to use a cstring instead of an array. Backend implementation are using a cstring,
+//                            so they were losing the data after the creation struct was going out of scope.
+//      0.46  (2021/11/06): + Added initial support for Vulkan bindless by creating custom descriptor set, layout and pools.
 //      0.45  (2021/10/26): + Added VkRenderPass cache based on RenderPassOutput struct hash. + Fixed resize GPU query problems.
 //      0.44  (2021/10/25): + Added support for color/depth operation for each render pass.
 //      0.43  (2021/10/24): + Added Vulkan support for Storage/Structured and Indirect buffers. + Enabled all hardware features by default on Vulkan device creation.

@@ -96,7 +96,7 @@ namespace hydra {
         void                        reserve( u64 new_size );
 
         // Internal methods
-        void                        erase_meta( FlatHashMapIterator& iterator );
+        void                        erase_meta( const FlatHashMapIterator& iterator );
 
         FindResult                  find_or_prepare_insert( const K& key );
         FindInfo                    find_first_non_full( u64 hash );
@@ -351,7 +351,7 @@ namespace hydra {
     }
 
     template <typename K, typename V>
-    void FlatHashMap<K, V>::erase_meta( FlatHashMapIterator& iterator ) {
+    void FlatHashMap<K, V>::erase_meta( const FlatHashMapIterator& iterator ) {
         --size;
 
         const u64 index = iterator.index;
@@ -606,7 +606,9 @@ namespace hydra {
 
     template<typename K, typename V>
     V& FlatHashMap<K, V>::get( const FlatHashMapIterator& iterator ) {
-        return slots_[ iterator.index ].value;
+        if ( iterator.index != k_iterator_end )
+            return slots_[ iterator.index ].value;
+        return default_key_value.value;
     }
 
     template <typename K, typename V>

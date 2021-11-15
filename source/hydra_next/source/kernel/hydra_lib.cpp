@@ -1,5 +1,5 @@
 
-// Hydra Lib - v0.30
+// Hydra Lib - v0.33
 
 #include "hydra_lib.hpp"
 

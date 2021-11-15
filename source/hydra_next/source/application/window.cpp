@@ -1,6 +1,7 @@
 #include "window.hpp"
 
 #include "kernel/log.hpp"
+#include "kernel/numerics.hpp"
 
 #include <SDL.h>
 
@@ -105,19 +106,30 @@ void Window::handle_os_messages() {
                     case SDL_WINDOWEVENT_RESIZED:
                     {
                         // Resize only if even numbers are used?
-                        //u32 new_width = ( u32 )( event.window.data1 % 2 == 0 ? event.window.data1 : event.window.data1 - 1 );
-                        //u32 new_height = ( u32 )( event.window.data2 % 2 == 0 ? event.window.data2 : event.window.data2 - 1 );
+                        // NOTE: This goes in an infinite loop when maximising a window that has an odd width/height.
+                        /*if ( ( event.window.data1 % 2 == 1 ) || ( event.window.data2 % 2 == 1 ) ) {
+                            u32 new_width = ( u32 )( event.window.data1 % 2 == 0 ? event.window.data1 : event.window.data1 - 1 );
+                            u32 new_height = ( u32 )( event.window.data2 % 2 == 0 ? event.window.data2 : event.window.data2 - 1 );
 
-                        u32 new_width = ( u32 )( event.window.data1 );
-                        u32 new_height = ( u32 )( event.window.data2 );
+                            if ( new_width != width || new_height != height ) {
+                                SDL_SetWindowSize( window, new_width, new_height );
 
-                        // Update only if needed.
-                        if ( new_width != width || new_height != height ) {
-                            resized = true;
-                            width = new_width;
-                            height = new_height;
+                                hprint( "Forcing resize to a multiple of 2, %ux%u from %ux%u\n", new_width, new_height, event.window.data1, event.window.data2 );
+                            }
+                        }*/
+                        //else 
+                        {
+                            u32 new_width = ( u32 )( event.window.data1 );
+                            u32 new_height = ( u32 )( event.window.data2 );
 
-                            hprint( "Resizing to %u, %u\n", width, height );
+                            // Update only if needed.
+                            if ( new_width != width || new_height != height ) {
+                                resized = true;
+                                width = new_width;
+                                height = new_height;
+
+                                hprint( "Resizing to %u, %u\n", width, height );
+                            }
                         }
 
                         break;
@@ -215,7 +227,7 @@ void Window::unregister_os_messages_callback( OsMessagesCallback callback ) {
 
 void Window::center_mouse( bool dragging ) {
     if ( dragging ) {
-        SDL_WarpMouseInWindow( window, width / 2, height / 2 );
+        SDL_WarpMouseInWindow( window, hydra::roundu32(width / 2.f), hydra::roundu32(height / 2.f) );
         SDL_SetWindowGrab( window, SDL_TRUE );
     } else {
         SDL_SetWindowGrab( window, SDL_FALSE );

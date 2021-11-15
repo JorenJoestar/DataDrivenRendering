@@ -112,6 +112,9 @@ struct GpuDeviceVulkan : public Device {
     VkQueue                         vulkan_queue;
     uint32_t                        vulkan_queue_family;
     VkDescriptorPool                vulkan_descriptor_pool;
+    VkDescriptorPool                vulkan_descriptor_pool_bindless;
+    VkDescriptorSetLayout           vulkan_bindless_descriptor_layout;      // Global bindless descriptor layout.
+    VkDescriptorSet                 vulkan_bindless_descriptor_set;         // Global bindless descriptor set.
 
     // Swapchain
     VkImage                         vulkan_swapchain_images[ k_max_swapchain_images ];
@@ -142,11 +145,14 @@ struct GpuDeviceVulkan : public Device {
     
     VmaAllocator                    vma_allocator;
 
-    ResourceDeletion                resource_deletion_queue[ k_max_resource_deletions ];
+    ResourceUpdate                  resource_deletion_queue[ k_max_resource_deletions ];
     u32                             num_deletion_queue              = 0;
 
     ResourceListUpdate              resource_list_update_queue[ k_max_resource_deletions ];
     u32                             num_update_queue                = 0;
+
+    ResourceUpdate                  texture_to_update_bindless[ k_max_resource_deletions ];
+    u32                             num_texture_updates             = 0;
 
     f32                             gpu_timestamp_frequency;
     bool                            gpu_timestamp_reset             = true;

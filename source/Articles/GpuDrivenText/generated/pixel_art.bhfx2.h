@@ -78,7 +78,7 @@ namespace pixel_art {
 			};
 
 			static const uint32_t binding_cb_Local = 0; // Set 0, binding 0
-			static const uint32_t binding_tex_textures = 10; // Set 0, binding 10
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 
 		} // namespace frag
 

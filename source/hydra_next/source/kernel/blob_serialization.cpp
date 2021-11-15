@@ -13,6 +13,8 @@ void BlobSerializer::write_common( Allocator* allocator_, u32 serializer_version
     blob_memory = ( char* )halloca( size + sizeof( BlobHeader ), allocator_ );
     hy_assert( blob_memory );
 
+    has_allocated_memory = 1;
+
     total_size = ( u32 )size + sizeof( BlobHeader );
     serialized_offset = allocated_offset = 0;
 
@@ -32,8 +34,20 @@ void BlobSerializer::write_common( Allocator* allocator_, u32 serializer_version
 
 void BlobSerializer::shutdown() {
 
-    if ( blob_memory )
-        hfree( blob_memory, allocator );
+    if ( is_reading ) {
+        // When reading and serializing, we can free blob memory after read.
+        // Otherwise we will free the pointer when done.
+        if ( blob_memory && has_allocated_memory )
+            hfree( blob_memory, allocator );
+    }
+    else {
+        if ( blob_memory )
+            hfree( blob_memory, allocator );
+    }
+
+    /*if ( blob_memory )
+        hfree( blob_memory, allocator );*/
+    
 
     serialized_offset = allocated_offset = 0;
 }
@@ -168,6 +182,54 @@ void BlobSerializer::serialize_memory( void* data, sizet size ) {
     }
 
     serialized_offset += (u32)size;
+}
+
+void BlobSerializer::serialize_memory_block( void** data, u32* size ) {
+
+    serialize( size ); 
+
+    if ( is_reading ) {
+        // Blob --> Data
+        i32 source_data_offset;
+        serialize( &source_data_offset );
+
+        if ( source_data_offset > 0 ) {
+            // Cache serialized
+            u32 cached_serialized = serialized_offset;
+
+            serialized_offset = allocated_offset;
+
+            *data = data_memory + allocated_offset;
+
+            // Reserve memory
+            allocate_static( *size );
+
+            char* source_data = blob_memory + cached_serialized + source_data_offset - 4;
+            memcpy( *data, source_data, *size );
+            // Restore serialized
+            serialized_offset = cached_serialized;
+        } else {
+            *data = nullptr;
+            size = 0;
+        }
+    } else {
+        // Data --> Blob
+        // Data will be copied at the end of the current blob
+        i32 data_offset = allocated_offset - serialized_offset;
+        serialize( &data_offset );
+
+        u32 cached_serialized = serialized_offset;
+        // Move serialization to at the end of the blob.
+        serialized_offset = allocated_offset;
+        // Allocate memory in the blob
+        allocate_static( *size );
+
+        char* destination_data = blob_memory + serialized_offset;
+        memcpy( destination_data, *data, *size );
+
+        // Restore serialized
+        serialized_offset = cached_serialized;
+    }
 }
 
 void BlobSerializer::serialize( cstring data ) {

@@ -1,4 +1,4 @@
-// Hydra ImGUI - v0.13
+// Hydra ImGUI - v0.15
 
 #include "hydra_imgui.hpp"
 
@@ -74,6 +74,24 @@ static const char* g_vertex_shader_code_vulkan = {
     "}\n"
 };
 
+static const char* g_vertex_shader_code_vulkan_bindless = {
+    "#version 450\n"
+    "layout( location = 0 ) in vec2 Position;\n"
+    "layout( location = 1 ) in vec2 UV;\n"
+    "layout( location = 2 ) in uvec4 Color;\n"
+    "layout( location = 0 ) out vec2 Frag_UV;\n"
+    "layout( location = 1 ) out vec4 Frag_Color;\n"
+    "layout (location = 2) flat out uint texture_id;\n"
+    "layout( std140, binding = 0 ) uniform LocalConstants { mat4 ProjMtx; };\n"
+    "void main()\n"
+    "{\n"
+    "    Frag_UV = UV;\n"
+    "    Frag_Color = Color / 255.0f;\n"
+    "    texture_id = gl_InstanceIndex;\n"
+    "    gl_Position = ProjMtx * vec4( Position.xy,0,1 );\n"
+    "}\n"
+};
+
 static const char*                  g_fragment_shader_code = {
     "#version 450\n"
     "#extension GL_EXT_nonuniform_qualifier : enable\n"
@@ -81,8 +99,6 @@ static const char*                  g_fragment_shader_code = {
     "layout (location = 1) in vec4 Frag_Color;\n"
     "layout (location = 0) out vec4 Out_Color;\n"
     "layout (binding = 1) uniform sampler2D Texture;\n"
-    //"#extension GL_EXT_nonuniform_qualifier : enable\n"
-    //"layout (binding = 10) uniform sampler2D textures[];\n"
     "void main()\n"
     "{\n"
     "    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);\n"
@@ -94,12 +110,13 @@ static const char*                  g_fragment_shader_code_bindless = {
     "#extension GL_EXT_nonuniform_qualifier : enable\n"
     "layout (location = 0) in vec2 Frag_UV;\n"
     "layout (location = 1) in vec4 Frag_Color;\n"
+    "layout (location = 2) flat in uint texture_id;\n"
     "layout (location = 0) out vec4 Out_Color;\n"
     "#extension GL_EXT_nonuniform_qualifier : enable\n"
-    "layout (binding = 10) uniform sampler2D textures[];\n"
+    "layout (set = 1, binding = 10) uniform sampler2D textures[];\n"
     "void main()\n"
     "{\n"
-    "    Out_Color = Frag_Color * texture(textures[2], Frag_UV.st);\n"
+    "    Out_Color = Frag_Color * texture(textures[texture_id], Frag_UV.st);\n"
     "}\n"
 };
 
@@ -251,7 +268,7 @@ void ImGuiService::init( void* configuration ) {
 #elif defined(HYDRA_VULKAN)
 
     if ( gpu->bindless_supported ) {
-        shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code_vulkan, ( uint32_t )strlen( g_vertex_shader_code_vulkan ), ShaderStage::Vertex )
+        shader_creation.set_name( "ImGui" ).add_stage( g_vertex_shader_code_vulkan_bindless, ( uint32_t )strlen( g_vertex_shader_code_vulkan_bindless ), ShaderStage::Vertex )
             .add_stage( g_fragment_shader_code_bindless, ( uint32_t )strlen( g_fragment_shader_code_bindless ), ShaderStage::Fragment );
     }
     else {
@@ -369,6 +386,7 @@ void ImGuiService::render( hydra::gfx::Renderer* renderer, hydra::gfx::CommandBu
     size_t index_size = draw_data->TotalIdxCount * sizeof( ImDrawIdx );
 
     if ( vertex_size >= g_vb_size || index_size >= g_ib_size ) {
+        hprint( "ImGui Backend Error: vertex/index overflow!\n" );
         return;
     }
 
@@ -494,29 +512,31 @@ void ImGuiService::render( hydra::gfx::Renderer* renderer, hydra::gfx::CommandBu
 
                     // Retrieve 
                     TextureHandle new_texture = *(TextureHandle*)( pcmd->TextureId );
-                    if ( new_texture.index != last_texture.index && new_texture.index != k_invalid_texture.index ) {
-                        last_texture = new_texture;
-                        FlatHashMapIterator it = g_texture_to_resource_list.find( last_texture.index );
+                    if ( !gpu.bindless_supported ) {
+                        if ( new_texture.index != last_texture.index && new_texture.index != k_invalid_texture.index ) {
+                            last_texture = new_texture;
+                            FlatHashMapIterator it = g_texture_to_resource_list.find( last_texture.index );
 
-                        // TODO: invalidate handles and update resource list when needed ?
-                        // Found this problem when reusing the handle from a previous 
-                        // If not present
-                        if ( it.is_invalid() ) {
-                            // Create new resource list
-                            ResourceListCreation rl_creation{};
+                            // TODO: invalidate handles and update resource list when needed ?
+                            // Found this problem when reusing the handle from a previous 
+                            // If not present
+                            if ( it.is_invalid() ) {
+                                // Create new resource list
+                                ResourceListCreation rl_creation{};
 
-                            rl_creation.set_layout( g_resource_layout ).buffer( g_ui_cb, 0 ).texture( last_texture, 1 ).set_name( "RL_Dynamic_ImGUI" );
-                            last_resource_list = gpu.create_resource_list( rl_creation );
+                                rl_creation.set_layout( g_resource_layout ).buffer( g_ui_cb, 0 ).texture( last_texture, 1 ).set_name( "RL_Dynamic_ImGUI" );
+                                last_resource_list = gpu.create_resource_list( rl_creation );
 
-                            g_texture_to_resource_list.insert( new_texture.index, last_resource_list.index );
+                                g_texture_to_resource_list.insert( new_texture.index, last_resource_list.index );
+                            }
+                            else {
+                                last_resource_list.index = g_texture_to_resource_list.get( it );
+                            }
+                            commands.bind_resource_list( sort_key++, &last_resource_list, 1, nullptr, 0 );
                         }
-                        else {
-                            last_resource_list.index = g_texture_to_resource_list.get( it );
-                        }
-                        commands.bind_resource_list( sort_key++, &last_resource_list, 1, nullptr, 0 );
                     }
 
-                    commands.draw_indexed( sort_key++, hydra::gfx::TopologyType::Triangle, pcmd->ElemCount, 1, index_buffer_offset + pcmd->IdxOffset, vtx_buffer_offset + pcmd->VtxOffset, 0 );
+                    commands.draw_indexed( sort_key++, hydra::gfx::TopologyType::Triangle, pcmd->ElemCount, 1, index_buffer_offset + pcmd->IdxOffset, vtx_buffer_offset + pcmd->VtxOffset, new_texture.index );
                 }
             }
             
@@ -528,41 +548,266 @@ void ImGuiService::render( hydra::gfx::Renderer* renderer, hydra::gfx::CommandBu
     commands.pop_marker();
 }
 
+static void set_style_dark_gold();
+static void set_style_green_blue();
+static void set_style_dark_red();
 
-void imgui_on_resize( hydra::gfx::Device& gpu, u32 width, u32 height ) {
-    using namespace hydra::gfx;
+void ImGuiService::set_style( ImGuiStyles style ) {
 
-    // Rebind textures to resource lists
-    // todo:map
-    /*const u32 num_textures = hash_map_size( g_texture_to_resource_list );
-    for ( u32 i = 0; i < num_textures; ++i ) {
-        const TextureToResourceListMap& entry = g_texture_to_resource_list[ i ];
-        ResourceListUpdate u;
-        ResourceListHandle rl = { entry.value };
-        u.resource_list = rl;
-        gpu.update_resource_list_instant( u );
-    }*/
+    switch ( style ) {
+        case GreenBlue:
+        {
+            set_style_green_blue();
+            break;
+        }
+
+        case DarkRed:
+        {
+            set_style_dark_red();
+            break;
+        }
+
+        case DarkGold:
+        {
+            set_style_dark_gold();
+            break;
+        }
+
+        default:
+        case Default:
+        {
+            ImGui::StyleColorsDark();
+            break;
+        }
+    }
 }
 
-void imgui_remove_cached_texture( hydra::gfx::Device& gpu, hydra::gfx::TextureHandle& texture ) {
+
+//void imgui_on_resize( hydra::gfx::Device& gpu, u32 width, u32 height ) {
+//    using namespace hydra::gfx;
+//
+//    // Rebind textures to resource lists
+//    // todo:map
+//    const u32 num_textures = hash_map_size( g_texture_to_resource_list );
+//    for ( u32 i = 0; i < num_textures; ++i ) {
+//        const TextureToResourceListMap& entry = g_texture_to_resource_list[ i ];
+//        ResourceListUpdate u;
+//        ResourceListHandle rl = { entry.value };
+//        u.resource_list = rl;
+//        gpu.update_resource_list_instant( u );
+//    }
+//}
+
+void ImGuiService::remove_cached_texture( hydra::gfx::TextureHandle& texture ) {
     FlatHashMapIterator it = g_texture_to_resource_list.find( texture.index );
     if ( it.is_valid() ) {
         
         // Destroy resource list
         hydra::gfx::ResourceListHandle resource_list{ g_texture_to_resource_list.get(it) };
-        gpu.destroy_resource_list( resource_list );
+        gfx->gpu->destroy_resource_list( resource_list );
 
         // Remove from cache
         g_texture_to_resource_list.remove( texture.index );
     }
     
 }
-//
-// Create draw commands from ImGui draw data.
-//
-void imgui_collect_draw_data( ImDrawData* draw_data, hydra::gfx::Device& gpu_device, hydra::gfx::CommandBuffer& commands )
-{
-    
+
+void set_style_dark_red() {
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ ImGuiCol_Text ] = ImVec4( 0.75f, 0.75f, 0.75f, 1.00f );
+    colors[ ImGuiCol_TextDisabled ] = ImVec4( 0.35f, 0.35f, 0.35f, 1.00f );
+    colors[ ImGuiCol_WindowBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.94f );
+    colors[ ImGuiCol_ChildBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_PopupBg ] = ImVec4( 0.08f, 0.08f, 0.08f, 0.94f );
+    colors[ ImGuiCol_Border ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.50f );
+    colors[ ImGuiCol_BorderShadow ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_FrameBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.54f );
+    colors[ ImGuiCol_FrameBgHovered ] = ImVec4( 0.37f, 0.14f, 0.14f, 0.67f );
+    colors[ ImGuiCol_FrameBgActive ] = ImVec4( 0.39f, 0.20f, 0.20f, 0.67f );
+    colors[ ImGuiCol_TitleBg ] = ImVec4( 0.04f, 0.04f, 0.04f, 1.00f );
+    colors[ ImGuiCol_TitleBgActive ] = ImVec4( 0.48f, 0.16f, 0.16f, 1.00f );
+    colors[ ImGuiCol_TitleBgCollapsed ] = ImVec4( 0.48f, 0.16f, 0.16f, 1.00f );
+    colors[ ImGuiCol_MenuBarBg ] = ImVec4( 0.14f, 0.14f, 0.14f, 1.00f );
+    colors[ ImGuiCol_ScrollbarBg ] = ImVec4( 0.02f, 0.02f, 0.02f, 0.53f );
+    colors[ ImGuiCol_ScrollbarGrab ] = ImVec4( 0.31f, 0.31f, 0.31f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( 0.41f, 0.41f, 0.41f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabActive ] = ImVec4( 0.51f, 0.51f, 0.51f, 1.00f );
+    colors[ ImGuiCol_CheckMark ] = ImVec4( 0.56f, 0.10f, 0.10f, 1.00f );
+    colors[ ImGuiCol_SliderGrab ] = ImVec4( 1.00f, 0.19f, 0.19f, 0.40f );
+    colors[ ImGuiCol_SliderGrabActive ] = ImVec4( 0.89f, 0.00f, 0.19f, 1.00f );
+    colors[ ImGuiCol_Button ] = ImVec4( 1.00f, 0.19f, 0.19f, 0.40f );
+    colors[ ImGuiCol_ButtonHovered ] = ImVec4( 0.80f, 0.17f, 0.00f, 1.00f );
+    colors[ ImGuiCol_ButtonActive ] = ImVec4( 0.89f, 0.00f, 0.19f, 1.00f );
+    colors[ ImGuiCol_Header ] = ImVec4( 0.33f, 0.35f, 0.36f, 0.53f );
+    colors[ ImGuiCol_HeaderHovered ] = ImVec4( 0.76f, 0.28f, 0.44f, 0.67f );
+    colors[ ImGuiCol_HeaderActive ] = ImVec4( 0.47f, 0.47f, 0.47f, 0.67f );
+    colors[ ImGuiCol_Separator ] = ImVec4( 0.32f, 0.32f, 0.32f, 1.00f );
+    colors[ ImGuiCol_SeparatorHovered ] = ImVec4( 0.32f, 0.32f, 0.32f, 1.00f );
+    colors[ ImGuiCol_SeparatorActive ] = ImVec4( 0.32f, 0.32f, 0.32f, 1.00f );
+    colors[ ImGuiCol_ResizeGrip ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.85f );
+    colors[ ImGuiCol_ResizeGripHovered ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.60f );
+    colors[ ImGuiCol_ResizeGripActive ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.90f );
+    colors[ ImGuiCol_Tab ] = ImVec4( 0.07f, 0.07f, 0.07f, 0.51f );
+    colors[ ImGuiCol_TabHovered ] = ImVec4( 0.86f, 0.23f, 0.43f, 0.67f );
+    colors[ ImGuiCol_TabActive ] = ImVec4( 0.19f, 0.19f, 0.19f, 0.57f );
+    colors[ ImGuiCol_TabUnfocused ] = ImVec4( 0.05f, 0.05f, 0.05f, 0.90f );
+    colors[ ImGuiCol_TabUnfocusedActive ] = ImVec4( 0.13f, 0.13f, 0.13f, 0.74f );
+#if defined(IMGUI_HAS_DOCK)
+    colors[ ImGuiCol_DockingPreview ] = ImVec4( 0.47f, 0.47f, 0.47f, 0.47f );
+    colors[ ImGuiCol_DockingEmptyBg ] = ImVec4( 0.20f, 0.20f, 0.20f, 1.00f );
+#endif // IMGUI_HAS_DOCK
+    colors[ ImGuiCol_PlotLines ] = ImVec4( 0.61f, 0.61f, 0.61f, 1.00f );
+    colors[ ImGuiCol_PlotLinesHovered ] = ImVec4( 1.00f, 0.43f, 0.35f, 1.00f );
+    colors[ ImGuiCol_PlotHistogram ] = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
+    colors[ ImGuiCol_PlotHistogramHovered ] = ImVec4( 1.00f, 0.60f, 0.00f, 1.00f );
+#if defined(IMGUI_HAS_TABLE)
+    colors[ ImGuiCol_TableHeaderBg ] = ImVec4( 0.19f, 0.19f, 0.20f, 1.00f );
+    colors[ ImGuiCol_TableBorderStrong ] = ImVec4( 0.31f, 0.31f, 0.35f, 1.00f );
+    colors[ ImGuiCol_TableBorderLight ] = ImVec4( 0.23f, 0.23f, 0.25f, 1.00f );
+    colors[ ImGuiCol_TableRowBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_TableRowBgAlt ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.07f );
+#endif // IMGUI_HAS_TABLE
+    colors[ ImGuiCol_TextSelectedBg ] = ImVec4( 0.26f, 0.59f, 0.98f, 0.35f );
+    colors[ ImGuiCol_DragDropTarget ] = ImVec4( 1.00f, 1.00f, 0.00f, 0.90f );
+    colors[ ImGuiCol_NavHighlight ] = ImVec4( 0.26f, 0.59f, 0.98f, 1.00f );
+    colors[ ImGuiCol_NavWindowingHighlight ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.70f );
+    colors[ ImGuiCol_NavWindowingDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.20f );
+    colors[ ImGuiCol_ModalWindowDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.35f );
+}
+
+
+void set_style_green_blue() {
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ ImGuiCol_Text ] = ImVec4( 1.00f, 1.00f, 1.00f, 1.00f );
+    colors[ ImGuiCol_TextDisabled ] = ImVec4( 0.50f, 0.50f, 0.50f, 1.00f );
+    colors[ ImGuiCol_WindowBg ] = ImVec4( 0.06f, 0.06f, 0.06f, 0.94f );
+    colors[ ImGuiCol_ChildBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_PopupBg ] = ImVec4( 0.08f, 0.08f, 0.08f, 0.94f );
+    colors[ ImGuiCol_Border ] = ImVec4( 0.43f, 0.43f, 0.50f, 0.50f );
+    colors[ ImGuiCol_BorderShadow ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_FrameBg ] = ImVec4( 0.44f, 0.44f, 0.44f, 0.60f );
+    colors[ ImGuiCol_FrameBgHovered ] = ImVec4( 0.57f, 0.57f, 0.57f, 0.70f );
+    colors[ ImGuiCol_FrameBgActive ] = ImVec4( 0.76f, 0.76f, 0.76f, 0.80f );
+    colors[ ImGuiCol_TitleBg ] = ImVec4( 0.04f, 0.04f, 0.04f, 1.00f );
+    colors[ ImGuiCol_TitleBgActive ] = ImVec4( 0.16f, 0.16f, 0.16f, 1.00f );
+    colors[ ImGuiCol_TitleBgCollapsed ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.60f );
+    colors[ ImGuiCol_MenuBarBg ] = ImVec4( 0.14f, 0.14f, 0.14f, 1.00f );
+    colors[ ImGuiCol_ScrollbarBg ] = ImVec4( 0.02f, 0.02f, 0.02f, 0.53f );
+    colors[ ImGuiCol_ScrollbarGrab ] = ImVec4( 0.31f, 0.31f, 0.31f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( 0.41f, 0.41f, 0.41f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabActive ] = ImVec4( 0.51f, 0.51f, 0.51f, 1.00f );
+    colors[ ImGuiCol_CheckMark ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.80f );
+    colors[ ImGuiCol_SliderGrab ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.80f );
+    colors[ ImGuiCol_SliderGrabActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_Button ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.40f );
+    colors[ ImGuiCol_ButtonHovered ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.60f );
+    colors[ ImGuiCol_ButtonActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_Header ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.40f );
+    colors[ ImGuiCol_HeaderHovered ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.60f );
+    colors[ ImGuiCol_HeaderActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_Separator ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.40f );
+    colors[ ImGuiCol_SeparatorHovered ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.60f );
+    colors[ ImGuiCol_SeparatorActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_ResizeGrip ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.40f );
+    colors[ ImGuiCol_ResizeGripHovered ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.60f );
+    colors[ ImGuiCol_ResizeGripActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_Tab ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.80f );
+    colors[ ImGuiCol_TabHovered ] = ImVec4( 0.13f, 0.75f, 0.75f, 0.80f );
+    colors[ ImGuiCol_TabActive ] = ImVec4( 0.13f, 0.75f, 1.00f, 0.80f );
+    colors[ ImGuiCol_TabUnfocused ] = ImVec4( 0.18f, 0.18f, 0.18f, 1.00f );
+    colors[ ImGuiCol_TabUnfocusedActive ] = ImVec4( 0.36f, 0.36f, 0.36f, 0.54f );
+#if defined(IMGUI_HAS_DOCK)
+    colors[ ImGuiCol_DockingPreview ] = ImVec4( 0.13f, 0.75f, 0.55f, 0.80f );
+    colors[ ImGuiCol_DockingEmptyBg ] = ImVec4( 0.13f, 0.13f, 0.13f, 0.80f );
+#endif // IMGUI_HAS_DOCK
+    colors[ ImGuiCol_PlotLines ] = ImVec4( 0.61f, 0.61f, 0.61f, 1.00f );
+    colors[ ImGuiCol_PlotLinesHovered ] = ImVec4( 1.00f, 0.43f, 0.35f, 1.00f );
+    colors[ ImGuiCol_PlotHistogram ] = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
+    colors[ ImGuiCol_PlotHistogramHovered ] = ImVec4( 1.00f, 0.60f, 0.00f, 1.00f );
+#if defined (IMGUI_HAS_TABLE)
+    colors[ ImGuiCol_TableHeaderBg ] = ImVec4( 0.19f, 0.19f, 0.20f, 1.00f );
+    colors[ ImGuiCol_TableBorderStrong ] = ImVec4( 0.31f, 0.31f, 0.35f, 1.00f );
+    colors[ ImGuiCol_TableBorderLight ] = ImVec4( 0.23f, 0.23f, 0.25f, 1.00f );
+    colors[ ImGuiCol_TableRowBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_TableRowBgAlt ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.07f );
+#endif // IMGUI_HAS_TABLE
+    colors[ ImGuiCol_TextSelectedBg ] = ImVec4( 0.26f, 0.59f, 0.98f, 0.35f );
+    colors[ ImGuiCol_DragDropTarget ] = ImVec4( 1.00f, 1.00f, 0.00f, 0.90f );
+    colors[ ImGuiCol_NavHighlight ] = ImVec4( 0.26f, 0.59f, 0.98f, 1.00f );
+    colors[ ImGuiCol_NavWindowingHighlight ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.70f );
+    colors[ ImGuiCol_NavWindowingDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.20f );
+    colors[ ImGuiCol_ModalWindowDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.35f );
+}
+
+static void set_style_dark_gold() {
+    ImGuiStyle* style = &ImGui::GetStyle();
+    ImVec4* colors = style->Colors;
+
+    colors[ ImGuiCol_Text ] = ImVec4( 0.92f, 0.92f, 0.92f, 1.00f );
+    colors[ ImGuiCol_TextDisabled ] = ImVec4( 0.44f, 0.44f, 0.44f, 1.00f );
+    colors[ ImGuiCol_WindowBg ] = ImVec4( 0.06f, 0.06f, 0.06f, 1.00f );
+    colors[ ImGuiCol_ChildBg ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_PopupBg ] = ImVec4( 0.08f, 0.08f, 0.08f, 0.94f );
+    colors[ ImGuiCol_Border ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_BorderShadow ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.00f );
+    colors[ ImGuiCol_FrameBg ] = ImVec4( 0.11f, 0.11f, 0.11f, 1.00f );
+    colors[ ImGuiCol_FrameBgHovered ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_FrameBgActive ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_TitleBg ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_TitleBgActive ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_TitleBgCollapsed ] = ImVec4( 0.00f, 0.00f, 0.00f, 0.51f );
+    colors[ ImGuiCol_MenuBarBg ] = ImVec4( 0.11f, 0.11f, 0.11f, 1.00f );
+    colors[ ImGuiCol_ScrollbarBg ] = ImVec4( 0.06f, 0.06f, 0.06f, 0.53f );
+    colors[ ImGuiCol_ScrollbarGrab ] = ImVec4( 0.21f, 0.21f, 0.21f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( 0.47f, 0.47f, 0.47f, 1.00f );
+    colors[ ImGuiCol_ScrollbarGrabActive ] = ImVec4( 0.81f, 0.83f, 0.81f, 1.00f );
+    colors[ ImGuiCol_CheckMark ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_SliderGrab ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_SliderGrabActive ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_Button ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_ButtonHovered ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_ButtonActive ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_Header ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_HeaderHovered ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_HeaderActive ] = ImVec4( 0.93f, 0.65f, 0.14f, 1.00f );
+    colors[ ImGuiCol_Separator ] = ImVec4( 0.21f, 0.21f, 0.21f, 1.00f );
+    colors[ ImGuiCol_SeparatorHovered ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_SeparatorActive ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_ResizeGrip ] = ImVec4( 0.21f, 0.21f, 0.21f, 1.00f );
+    colors[ ImGuiCol_ResizeGripHovered ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_ResizeGripActive ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_Tab ] = ImVec4( 0.51f, 0.36f, 0.15f, 1.00f );
+    colors[ ImGuiCol_TabHovered ] = ImVec4( 0.91f, 0.64f, 0.13f, 1.00f );
+    colors[ ImGuiCol_TabActive ] = ImVec4( 0.78f, 0.55f, 0.21f, 1.00f );
+    colors[ ImGuiCol_TabUnfocused ] = ImVec4( 0.07f, 0.10f, 0.15f, 0.97f );
+    colors[ ImGuiCol_TabUnfocusedActive ] = ImVec4( 0.14f, 0.26f, 0.42f, 1.00f );
+    colors[ ImGuiCol_PlotLines ] = ImVec4( 0.61f, 0.61f, 0.61f, 1.00f );
+    colors[ ImGuiCol_PlotLinesHovered ] = ImVec4( 1.00f, 0.43f, 0.35f, 1.00f );
+    colors[ ImGuiCol_PlotHistogram ] = ImVec4( 0.90f, 0.70f, 0.00f, 1.00f );
+    colors[ ImGuiCol_PlotHistogramHovered ] = ImVec4( 1.00f, 0.60f, 0.00f, 1.00f );
+    colors[ ImGuiCol_TextSelectedBg ] = ImVec4( 0.26f, 0.59f, 0.98f, 0.35f );
+    colors[ ImGuiCol_DragDropTarget ] = ImVec4( 1.00f, 1.00f, 0.00f, 0.90f );
+    colors[ ImGuiCol_NavHighlight ] = ImVec4( 0.26f, 0.59f, 0.98f, 1.00f );
+    colors[ ImGuiCol_NavWindowingHighlight ] = ImVec4( 1.00f, 1.00f, 1.00f, 0.70f );
+    colors[ ImGuiCol_NavWindowingDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.20f );
+    colors[ ImGuiCol_ModalWindowDimBg ] = ImVec4( 0.80f, 0.80f, 0.80f, 0.35f );
+
+    style->FramePadding = ImVec2( 4, 2 );
+    style->ItemSpacing = ImVec2( 10, 2 );
+    style->IndentSpacing = 12;
+    style->ScrollbarSize = 10;
+
+    style->WindowRounding = 4;
+    style->FrameRounding = 4;
+    style->PopupRounding = 4;
+    style->ScrollbarRounding = 6;
+    style->GrabRounding = 4;
+    style->TabRounding = 4;
+
+    style->WindowTitleAlign = ImVec2( 1.0f, 0.5f );
+    style->WindowMenuButtonPosition = ImGuiDir_Right;
+
+    style->DisplaySafeAreaPadding = ImVec2( 4, 4 );
 }
 
 // File Dialog //////////////////////////////////////////////////////////////////

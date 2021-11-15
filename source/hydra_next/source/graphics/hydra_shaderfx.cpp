@@ -1,4 +1,4 @@
-// Hydra HFX v0.51
+// Hydra HFX v0.52
 
 #include "hydra_shaderfx.h"
 
@@ -2453,51 +2453,52 @@ static void update_shader_chunk_list( uint32_t* current_shader_offset, uint32_t 
 static void write_automatic_resources_layout( const hfx::Pass& pass, StringBuffer& pass_buffer, uint32_t& pass_offset ) {
 
     using namespace hydra::gfx;
+    // TODO: restore
+    hy_assert( false );
+    //// Add the local constant buffer obtained from all the properties in the layout.
+    //hydra::gfx::ResourceLayoutCreation::Binding binding = { hydra::gfx::ResourceType::Constants, 0, 1, "MaterialConstants" };
+    //char* num_resources_data = pass_buffer.reserve( sizeof( uint8_t ) );
 
-    // Add the local constant buffer obtained from all the properties in the layout.
-    hydra::gfx::ResourceLayoutCreation::Binding binding = { hydra::gfx::ResourceType::Constants, 0, 1, "MaterialConstants" };
-    char* num_resources_data = pass_buffer.reserve( sizeof( uint8_t ) );
+    //uint8_t num_resources = 1;  // Local constants added
+    //pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
+    //pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) + sizeof( uint8_t );
 
-    uint8_t num_resources = 1;  // Local constants added
-    pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
-    pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) + sizeof( uint8_t );
+    //for ( size_t s = 0; s < pass.shader_stages.size(); ++s ) {
+    //    const Pass::ShaderStage shader_stage = pass.shader_stages[s];
 
-    for ( size_t s = 0; s < pass.shader_stages.size(); ++s ) {
-        const Pass::ShaderStage shader_stage = pass.shader_stages[s];
+    //    for ( size_t p = 0; p < shader_stage.code->resources.size(); p++ ) {
+    //        const hfx::CodeFragment::Resource& resource = shader_stage.code->resources[p];
 
-        for ( size_t p = 0; p < shader_stage.code->resources.size(); p++ ) {
-            const hfx::CodeFragment::Resource& resource = shader_stage.code->resources[p];
+    //        switch ( resource.type ) {
+    //            case ResourceType::Texture:
+    //            {
+    //                StringRef::copy_to( resource.name, binding.name, 32 );
+    //                binding.type = hydra::gfx::ResourceType::Texture;
 
-            switch ( resource.type ) {
-                case ResourceType::Texture:
-                {
-                    StringRef::copy_to( resource.name, binding.name, 32 );
-                    binding.type = hydra::gfx::ResourceType::Texture;
+    //                pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
+    //                pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding );
+    //                ++num_resources;
 
-                    pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
-                    pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding );
-                    ++num_resources;
+    //                break;
+    //            }
 
-                    break;
-                }
+    //            case ResourceType::ImageRW:
+    //            {
+    //                StringRef::copy_to( resource.name, binding.name, 32 );
+    //                binding.type = hydra::gfx::ResourceType::ImageRW;
 
-                case ResourceType::ImageRW:
-                {
-                    StringRef::copy_to( resource.name, binding.name, 32 );
-                    binding.type = hydra::gfx::ResourceType::ImageRW;
+    //                pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
+    //                pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding );
+    //                num_resources;
 
-                    pass_buffer.append_m( (void*)&binding, sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) );
-                    pass_offset += sizeof( hydra::gfx::ResourceLayoutCreation::Binding );
-                    num_resources;
+    //                break;
+    //            }
+    //        }
+    //    }
+    //}
 
-                    break;
-                }
-            }
-        }
-    }
-
-    // Write num resources
-    memcpy( num_resources_data, &num_resources, sizeof( uint8_t ) );
+    //// Write num resources
+    //memcpy( num_resources_data, &num_resources, sizeof( uint8_t ) );
 }
 
 //
@@ -2746,8 +2747,12 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
 
         // Render state
         if ( pass.render_state ) {
-            
-            blob.allocate_and_set<RenderStateBlueprint>( pass_blueprint.render_state, ( void* )&pass.render_state->rasterization );
+            // AddressSanitizer found:
+            //blob.allocate_and_set<RenderStateBlueprint>( pass_blueprint.render_state, ( void* )&pass.render_state->rasterization );
+            blob.allocate_and_set<RenderStateBlueprint>( pass_blueprint.render_state, nullptr );
+            // Manual memcpy - RenderStateBlueprint and RenderState have different sizes!
+            const sizet copy_size = sizeof( hydra::gfx::RasterizationCreation ) + sizeof( hydra::gfx::DepthStencilCreation ) + sizeof( hydra::gfx::BlendStateCreation );
+            hydra::memory_copy( pass_blueprint.render_state.get(), ( void* )&pass.render_state->rasterization, copy_size );
         }
         else {
             pass_blueprint.render_state.offset = 0;
@@ -3371,7 +3376,7 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
             hfree( text, &heap_allocator );
             // TODO memory (not anymore) Allocator still has allocations from hfx_memory.
 
-            return true;
+            return false;
         }
 #else
         ShaderEffectFile::Header file_header;
@@ -3391,7 +3396,7 @@ bool hfx_compile( const char* input_filename, const char* output_filename, u32 o
             hfree( text, &heap_allocator );
             // TODO memory (not anymore) Allocator still has allocations from hfx_memory.
 
-            return true;
+            return false;
         }
 #endif // HFX_V2            
     }
@@ -3966,7 +3971,17 @@ void ShaderPassBlueprint::fill_resource_layout( hydra::gfx::ResourceLayoutCreati
     hfx::ResourceLayoutBlueprint& rlb = resource_layouts[ index ];
     creation.num_bindings = rlb.bindings.size;
 
-    memcpy( creation.bindings, rlb.bindings.get(), sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) * creation.num_bindings );
+    for ( u32 i = 0; i < creation.num_bindings; ++i ) {
+        hydra::gfx::ResourceLayoutCreation::Binding& out_binding = creation.bindings[ i ];
+        ResourceBinding& in_binding = rlb.bindings[ i ];
+        //strcpy( out_binding.name, in_binding.name );
+
+        out_binding.start = in_binding.start;
+        out_binding.count = in_binding.count;
+        out_binding.type = in_binding.type;
+        out_binding.name = in_binding.name;
+    }
+    //memcpy( creation.bindings, rlb.bindings.get(), sizeof( hydra::gfx::ResourceLayoutCreation::Binding ) * creation.num_bindings );
 }
 
 } // namespace hfx

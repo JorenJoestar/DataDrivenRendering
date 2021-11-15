@@ -160,7 +160,7 @@ void GPUTimestampManager::reset() {
 
 bool GPUTimestampManager::has_valid_queries() const {
     // Even number of queries means asymettrical queries, thus we don't sample.
-    return current_query > 0 && ((current_query % 2) == 0);
+    return current_query > 0 && (depth == 0);
 }
 
 u32 GPUTimestampManager::resolve( u32 current_frame, GPUTimestamp* timestamps_to_fill ) {

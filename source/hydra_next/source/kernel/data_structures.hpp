@@ -46,8 +46,8 @@ namespace hydra {
     }; // struct ResourcePoolTyped
 
     template<typename T>
-    inline void ResourcePoolTyped<T>::init( Allocator* allocator, u32 pool_size ) {
-        ResourcePool::init( allocator, pool_size, sizeof( T ) );
+    inline void ResourcePoolTyped<T>::init( Allocator* allocator_, u32 pool_size_ ) {
+        ResourcePool::init( allocator_, pool_size_, sizeof( T ) );
     }
 
     template<typename T>
@@ -58,9 +58,13 @@ namespace hydra {
     template<typename T>
     inline T* ResourcePoolTyped<T>::obtain() {
         u32 resource_index = ResourcePool::obtain_resource();
-        T* resource = get( resource_index );
-        resource->pool_index = resource_index;
-        return resource;
+        if ( resource_index != u32_max ) {
+            T* resource = get( resource_index );
+            resource->pool_index = resource_index;
+            return resource;
+        }
+        
+        return nullptr;
     }
 
     template<typename T>
