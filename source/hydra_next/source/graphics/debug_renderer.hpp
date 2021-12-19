@@ -9,32 +9,28 @@ struct Camera;
 
 //
 //
-struct LineVertex {
-    vec3s                           position;
-    hydra::gfx::ColorUint           color;
-
-    void                            set( vec3s position_, hydra::gfx::ColorUint color_ ) { position = position_; color = color_; }
-    void                            set( vec2s position_, hydra::gfx::ColorUint color_ ) { position = { position_.x, position_.y, 0 }; color = color_; }
-};
-
-
 struct DebugRenderer {
 
-    void                            init( hydra::gfx::Renderer& renderer, hydra::gfx::Shader* shader );
-    void                            shutdown( hydra::gfx::Renderer& renderer );
+    void                            init( hydra::gfx::Renderer* renderer );
+    void                            shutdown( hydra::gfx::Renderer* renderer );
+
+    void                            reload( hydra::gfx::Renderer* renderer, hydra::ResourceManager* resource_manager );
 
     void                            render( hydra::gfx::Renderer& renderer, hydra::gfx::CommandBuffer* commands, hydra::gfx::Camera& camera );
 
-    void                            line( const vec3s& from, const vec3s& to, hydra::gfx::ColorUint color0, hydra::gfx::ColorUint color1 );
-    void                            box( const vec3s& min, const vec3s max, hydra::gfx::ColorUint color );
+    void                            line( const vec3s& from, const vec3s& to, hydra::Color color );
+    void                            line( const vec3s& from, const vec3s& to, hydra::Color color0, hydra::Color color1 );
+    
+    void                            box( const vec3s& min, const vec3s max, hydra::Color color );
 
-    hydra::gfx::Shader*             shader_effect;
     hydra::gfx::Material*           material;
 
     hydra::gfx::Buffer*             lines_cb;
     hydra::gfx::Buffer*             lines_vb;
+    hydra::gfx::Buffer*             lines_vb_2d;
 
     u32                             current_line;
+    u32                             current_line_2d;
 
 }; // struct DebugRenderer
 

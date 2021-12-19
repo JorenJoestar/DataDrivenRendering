@@ -18,6 +18,8 @@ namespace hydra {
         void                        shutdown();
 
         void                        push( const T& element );
+        T&                          push_use();                 // Grow the size and return T to be filled.
+
         void                        pop();
         void                        delete_swap( u32 index );
 
@@ -28,6 +30,12 @@ namespace hydra {
         void                        set_size( u32 new_size );
         void                        set_capacity( u32 new_capacity );
         void                        grow( u32 new_capacity );
+
+        T&                          back();
+        const T&                    back() const;
+
+        T&                          front();
+        const T&                    front() const;
 
         u32                         size_in_bytes() const;
         u32                         capacity_in_bytes() const;
@@ -81,6 +89,16 @@ namespace hydra {
         }
 
         data[ size++ ] = element;
+    }
+
+    template<typename T>
+    inline T& Array<T>::push_use() {
+        if ( size >= capacity ) {
+            grow( capacity + 1 );
+        }
+        ++size;
+
+        return back();
     }
 
     template<typename T>
@@ -144,6 +162,30 @@ namespace hydra {
 
         data = new_data;
         capacity = new_capacity;
+    }
+
+    template<typename T>
+    inline T& Array<T>::back() {
+        hy_assert( size );
+        return data[ size - 1 ];
+    }
+
+    template<typename T>
+    inline const T& Array<T>::back() const {
+        hy_assert( size );
+        return data[ size - 1 ];
+    }
+
+    template<typename T>
+    inline T& Array<T>::front() {
+        hy_assert( size );
+        return data[ 0 ];
+    }
+
+    template<typename T>
+    inline const T& Array<T>::front() const {
+        hy_assert( size );
+        return data[ 0 ];
     }
 
     template<typename T>

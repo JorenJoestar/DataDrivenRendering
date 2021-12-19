@@ -20,25 +20,25 @@ struct SpriteConstants {
 // SpriteBatch ////////////////////////////////////////////////////////////
 static const u32 k_max_sprites = 3000;
 
-void SpriteBatch::init( hydra::gfx::Renderer& renderer, Allocator* allocator ) {
+void SpriteBatch::init( hydra::gfx::Renderer* renderer, Allocator* allocator ) {
 
     draw_batches.init( allocator, 8 );
 
     using namespace hydra::gfx;
 
     BufferCreation vbc = { BufferType::Vertex_mask, ResourceUsageType::Dynamic, sizeof( SpriteGPUData ) * k_max_sprites, nullptr, "sprites_batch_vb" };
-    sprite_instance_vb = renderer.create_buffer( vbc );
+    sprite_instance_vb = renderer->create_buffer( vbc );
 
     vbc.set_name( "sprite_batch_cb" ).set( BufferType::Constant_mask, ResourceUsageType::Dynamic, sizeof( SpriteConstants ) );
-    sprite_cb = renderer.create_buffer( vbc );
+    sprite_cb = renderer->create_buffer( vbc );
 
     current_pipeline.index = k_invalid_pipeline.index;
     current_resource_list.index = k_invalid_list.index;
 }
 
-void SpriteBatch::shutdown( hydra::gfx::Renderer& renderer ) {
-    renderer.destroy_buffer( sprite_cb );
-    renderer.destroy_buffer( sprite_instance_vb );
+void SpriteBatch::shutdown( hydra::gfx::Renderer* renderer ) {
+    renderer->destroy_buffer( sprite_cb );
+    renderer->destroy_buffer( sprite_instance_vb );
 
     draw_batches.shutdown();
 }
@@ -98,7 +98,8 @@ void SpriteBatch::add( SpriteGPUData& data ) {
 void SpriteBatch::set( hydra::gfx::PipelineHandle pipeline, hydra::gfx::ResourceListHandle resource_list ) {
     using namespace hydra::gfx;
 
-    if ( current_pipeline.index != k_invalid_pipeline.index && current_resource_list.index != k_invalid_list.index ) {
+    if ( current_pipeline.index != k_invalid_pipeline.index && current_resource_list.index != k_invalid_list.index &&
+         ( current_pipeline.index != pipeline.index )) {
         // Add a batch
         DrawBatch batch { current_pipeline, current_resource_list, previous_offset, num_sprites - previous_offset };
         draw_batches.push( batch );

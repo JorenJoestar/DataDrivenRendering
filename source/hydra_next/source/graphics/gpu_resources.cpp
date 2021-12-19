@@ -176,6 +176,7 @@ ShaderStateCreation& ShaderStateCreation::set_spv_input( bool value ) {
 // ResourceLayoutCreation //////////////////////////////////
 ResourceLayoutCreation& ResourceLayoutCreation::reset() {
     num_bindings = 0;
+    set_index = 0;
     return *this;
 }
 
@@ -184,11 +185,16 @@ ResourceLayoutCreation& ResourceLayoutCreation::add_binding( const Binding& bind
     return *this;
 }
 
-ResourceLayoutCreation& ResourceLayoutCreation::set_name( const char* name_ ) {
+ResourceLayoutCreation& ResourceLayoutCreation::set_name( cstring name_ ) {
     name = name_;
     return *this;
 }
 
+
+ResourceLayoutCreation& ResourceLayoutCreation::set_set_index( u32 index ) {
+    set_index = index;
+    return *this;
+}
 
 // ResourceListCreation ////////////////////////////////////
 ResourceListCreation& ResourceListCreation::reset() {
@@ -223,35 +229,8 @@ ResourceListCreation& ResourceListCreation::texture_sampler( TextureHandle textu
     return *this;
 }
 
-ResourceListCreation& ResourceListCreation::set_name( const char* name_ ) {
+ResourceListCreation& ResourceListCreation::set_name( cstring name_ ) {
     name = name_;
-    return *this;
-}
-
-// ResourceListUpdate //////////////////////////////////////
-ResourceListUpdate& ResourceListUpdate::reset() {
-    creation.reset();
-    frame_issued = u32_max;
-    return *this;
-}
-
-ResourceListUpdate& ResourceListUpdate::set_resource_list( ResourceListHandle handle ) {
-    resource_list = handle;
-    return *this;
-}
-
-ResourceListUpdate& ResourceListUpdate::texture( TextureHandle texture, u16 binding ) {
-    creation.texture( texture, binding );
-    return *this;
-}
-
-ResourceListUpdate& ResourceListUpdate::buffer( BufferHandle buffer, u16 binding ) {
-    creation.buffer( buffer, binding );
-    return *this;
-}
-
-ResourceListUpdate& ResourceListUpdate::texture_sampler( TextureHandle texture, SamplerHandle sampler, u16 binding ) {
-    creation.texture_sampler( texture, sampler, binding );
     return *this;
 }
 

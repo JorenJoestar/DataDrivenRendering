@@ -18,4 +18,7 @@ namespace hydra {
     double                          time_from_milliseconds( i64 starting_time ); // Convenience method.
     double                          time_from_seconds( i64 starting_time );      // Convenience method.
 
+    double                          time_delta_seconds( i64 starting_time, i64 ending_time );
+    double                          time_delta_milliseconds( i64 starting_time, i64 ending_time );
+
 } // namespace hydra

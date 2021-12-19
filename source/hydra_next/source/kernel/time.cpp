@@ -74,6 +74,14 @@ double time_from_seconds( i64 starting_time ) {
     return time_seconds( time_from( starting_time ) );
 }
 
+double time_delta_seconds( i64 starting_time, i64 ending_time ) {
+    return time_seconds( ending_time - starting_time );
+}
+
+double time_delta_milliseconds( i64 starting_time, i64 ending_time ) {
+    return time_milliseconds( ending_time - starting_time );
+}
+
 //
 //
 double time_microseconds( i64 time ) {

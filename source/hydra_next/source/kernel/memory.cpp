@@ -171,7 +171,7 @@ protected:
 
 void* HeapAllocator::allocate( sizet size, sizet alignment ) {
     
-    if ( size == 57 ) 
+    if ( size == 16 ) 
     {
         HydraStackWalker sw;
         sw.ShowCallstack();
@@ -181,12 +181,12 @@ void* HeapAllocator::allocate( sizet size, sizet alignment ) {
     hprint( "Mem: %p, size %llu \n", mem, size );
     return mem;
 }
-#endif // HYDRA_MEMORY_BEAST
+#else
 
 void* HeapAllocator::allocate( sizet size, sizet alignment ) {
     return tlsf_malloc( tlsf_handle, size );
 }
-
+#endif // HYDRA_MEMORY_BEAST
 
 void* HeapAllocator::allocate( sizet size, sizet alignment, cstring file, i32 line ) {
     return allocate( size, alignment );

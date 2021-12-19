@@ -4,7 +4,6 @@
 
 #include "graphics/gpu_enum.hpp"
 
-
 namespace hydra {
 
 struct Allocator;
@@ -200,7 +199,6 @@ struct BufferCreation {
     void*                           initial_data = nullptr;
 
     const char*                     name    = nullptr;
-    BufferHandle                    parent_buffer = k_invalid_buffer;
 
     BufferCreation&                 set( BufferType::Mask type, ResourceUsageType::Enum usage, u32 size );
     BufferCreation&                 set_data( void* data );
@@ -217,7 +215,7 @@ struct TextureCreation {
     u16                             height          = 1;
     u16                             depth           = 1;
     u8                              mipmaps         = 1;
-    u8                              flags           = 0;    // TextureCreationFlags bitmasks
+    u8                              flags           = 0;    // TextureFlags bitmasks
 
     TextureFormat::Enum             format          = TextureFormat::UNKNOWN;
     TextureType::Enum               type            = TextureType::Texture2D;
@@ -297,14 +295,16 @@ struct ResourceLayoutCreation {
     }; // struct Binding
 
     Binding                         bindings[ k_max_resources_per_list ];
-    u32                             num_bindings = 0;
+    u32                             num_bindings    = 0;
+    u32                             set_index       = 0;
 
-    const char*                     name = nullptr;
+    cstring                         name            = nullptr;
 
     // Building helpers
     ResourceLayoutCreation&         reset();
     ResourceLayoutCreation&         add_binding( const Binding& binding );
-    ResourceLayoutCreation&         set_name( const char* name );
+    ResourceLayoutCreation&         set_name( cstring name );
+    ResourceLayoutCreation&         set_set_index( u32 index );
 
 }; // struct ResourceLayoutCreation
 
@@ -319,7 +319,7 @@ struct ResourceListCreation {
     ResourceLayoutHandle            layout;
     u32                             num_resources   = 0;
 
-    const char*                     name            = nullptr;
+    cstring                         name            = nullptr;
 
     // Building helpers
     ResourceListCreation&           reset();
@@ -327,25 +327,16 @@ struct ResourceListCreation {
     ResourceListCreation&           texture( TextureHandle texture, u16 binding );
     ResourceListCreation&           buffer( BufferHandle buffer, u16 binding );
     ResourceListCreation&           texture_sampler( TextureHandle texture, SamplerHandle sampler, u16 binding );   // TODO: separate samplers from textures
-    ResourceListCreation&           set_name( const char* name );
+    ResourceListCreation&           set_name( cstring name );
 
 }; // struct ResourceListCreation
 
 //
 //
 struct ResourceListUpdate {
-    ResourceListCreation            creation;
     ResourceListHandle              resource_list;
 
     u32                             frame_issued = 0;
-
-    // Building helpers
-    ResourceListUpdate&             reset();
-    ResourceListUpdate&             set_resource_list( ResourceListHandle handle );
-    ResourceListUpdate&             texture( TextureHandle texture, u16 binding );
-    ResourceListUpdate&             buffer( BufferHandle buffer, u16 binding );
-    ResourceListUpdate&             texture_sampler( TextureHandle texture, SamplerHandle sampler, u16 binding );
-
 }; // ResourceListUpdate
 
 //
@@ -510,7 +501,7 @@ struct ResourceBinding {
 struct ShaderStateDescription {
 
     void*                           native_handle = nullptr;
-    const char*                     name        = nullptr;
+    cstring                         name        = nullptr;
 
 }; // struct ShaderStateDescription
 
@@ -519,13 +510,14 @@ struct ShaderStateDescription {
 struct BufferDescription {
 
     void*                           native_handle = nullptr;
+    cstring                         name        = nullptr;
 
     BufferType::Mask                type        = BufferType::Vertex_mask;
     ResourceUsageType::Enum         usage       = ResourceUsageType::Immutable;
     u32                             size        = 0;
     BufferHandle                    parent_handle;
 
-    const char*                     name        = nullptr;
+    
 
 }; // struct BufferDescription
 
@@ -533,13 +525,15 @@ struct BufferDescription {
 //
 struct TextureDescription {
 
-    void* native_handle = nullptr;
-    const char* name = nullptr;
-    u16                             width = 1;
-    u16                             height = 1;
-    u16                             depth = 1;
-    u8                              mipmaps = 1;
+    void*                           native_handle = nullptr;
+    cstring                         name        = nullptr;
+
+    u16                             width       = 1;
+    u16                             height      = 1;
+    u16                             depth       = 1;
+    u8                              mipmaps     = 1;
     u8                              render_target = 0;
+    u8                              compute_access = 0;
 
     TextureFormat::Enum             format = TextureFormat::UNKNOWN;
     TextureType::Enum               type = TextureType::Texture2D;
@@ -550,11 +544,11 @@ struct TextureDescription {
 //
 struct SamplerDescription {
 
-    const char* name = nullptr;
+    cstring                         name        = nullptr;
 
-    TextureFilter::Enum             min_filter = TextureFilter::Nearest;
-    TextureFilter::Enum             mag_filter = TextureFilter::Nearest;
-    TextureMipFilter::Enum          mip_filter = TextureMipFilter::Nearest;
+    TextureFilter::Enum             min_filter  = TextureFilter::Nearest;
+    TextureFilter::Enum             mag_filter  = TextureFilter::Nearest;
+    TextureMipFilter::Enum          mip_filter  = TextureMipFilter::Nearest;
 
     TextureAddressMode::Enum        address_mode_u = TextureAddressMode::Repeat;
     TextureAddressMode::Enum        address_mode_v = TextureAddressMode::Repeat;
@@ -622,6 +616,9 @@ struct ExecutionBarrier {
 
     PipelineStage::Enum             source_pipeline_stage;
     PipelineStage::Enum             destination_pipeline_stage;
+
+    u32                             new_barrier_experimental  = u32_max;
+    u32                             load_operation = 0;
 
     u32                             num_image_barriers;
     u32                             num_memory_barriers;

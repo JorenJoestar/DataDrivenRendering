@@ -120,7 +120,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HYDRA_BINDLESS;HYDRA_IMGUI;_CRT_SECURE_NO_WARNINGS;HYDRA_GFX_SDL;HYDRA_VULKAN;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(LIB_PATH)\SDL2-2.0.12\include\;$(VULKAN_SDK)\include;..\..\source\hydra_next\source;..\..\source;..\..\source\imgui;..\..\source\Articles\GpuDrivenText</AdditionalIncludeDirectories>
     </ClCompile>
@@ -166,6 +166,7 @@
     <ClCompile Include="..\..\source\hydra_next\source\graphics\debug_renderer.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_device.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_device_vulkan.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_profiler.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\graphics\gpu_resources.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\graphics\hydra_shaderfx.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\graphics\renderer.cpp" />
@@ -173,6 +174,7 @@
     <ClCompile Include="..\..\source\hydra_next\source\kernel\assert.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\bit.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\blob_serialization.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\color.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\data_structures.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\file.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\hydra_lib.cpp" />
@@ -181,6 +183,7 @@
     <ClCompile Include="..\..\source\hydra_next\source\kernel\memory.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\numerics.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\process.cpp" />
+    <ClCompile Include="..\..\source\hydra_next\source\kernel\resource_manager.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\serialization.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\service.cpp" />
     <ClCompile Include="..\..\source\hydra_next\source\kernel\service_manager.cpp" />

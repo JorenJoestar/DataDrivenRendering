@@ -27,4 +27,4 @@ struct Blob {
     BlobHeader          header;
 }; // struct Blob
 
-}
+} // namespace hydra

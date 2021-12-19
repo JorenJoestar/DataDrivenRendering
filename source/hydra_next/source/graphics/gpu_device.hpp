@@ -124,9 +124,9 @@ struct Device : public Service {
     const RenderPassOutput&         get_render_pass_output( RenderPassHandle render_pass ) const;
 
     // Update/Reload resources
-    void                            resize_output_textures( RenderPassHandle render_pass, u16 width, u16 height );
+    void                            resize_output_textures( RenderPassHandle render_pass, u32 width, u32 height );
 
-    void                            update_resource_list( const ResourceListUpdate& update );
+    void                            update_resource_list( ResourceListHandle resource_list );
 
     // Misc
     void                            link_texture_sampler( TextureHandle texture, SamplerHandle sampler );   // TODO: for now specify a sampler for a texture or use the default one.

@@ -12,11 +12,14 @@ namespace hydra {
 
 void AnimationSystem::init( Allocator* allocator_ ) {
     allocator = allocator_;
-    animation_datas.init( allocator, 4 );
+
+    data.init( allocator, 32 );
+    states.init( allocator, 32 );
 }
 
 void AnimationSystem::shutdown() {
-    animation_datas.shutdown();
+    data.shutdown();
+    states.shutdown();
 }
 
 static void set_time( AnimationState& state, const AnimationData& data, f32 time ) {
@@ -56,48 +59,52 @@ static void set_time( AnimationState& state, const AnimationData& data, f32 time
 
 void AnimationSystem::start_animation( AnimationState& animation, AnimationHandle handle, bool restart ) {
     if ( handle != animation.handle || restart ) {
-        set_time( animation, animation_datas[ handle ], 0.f );
+        set_time( animation, *data.get( handle ), 0.f);
         animation.handle = handle;
         animation.inverted = false;
     }
 }
 
 void AnimationSystem::update_animation( AnimationState& animation, f32 delta_time ) {
-    set_time( animation, animation_datas[ animation.handle ], animation.current_time + delta_time );
+    set_time( animation, *data.get( animation.handle ), animation.current_time + delta_time);
 }
 
 f32 AnimationSystem::get_duration( const AnimationState& animation ) const {
-    const AnimationData& data = animation_datas[ animation.handle ];
-    return f32( data.num_frames ) / data.fps;
+    const AnimationData& animation_data = *data.get( animation.handle );
+    return f32( animation_data.num_frames ) / animation_data.fps;
 }
 
 bool AnimationSystem::is_finished( const AnimationState& animation ) const {
-    const AnimationData& data = animation_datas[ animation.handle ];
-    const f32 duration = f32( data.num_frames ) / data.fps;
-    return data.is_looping ? false : animation.current_time >= duration;
+    const AnimationData& animation_data = *data.get( animation.handle );
+    const f32 duration = f32( animation_data.num_frames ) / animation_data.fps;
+    return animation_data.is_looping ? false : animation.current_time >= duration;
 }
 
 AnimationHandle AnimationSystem::create_animation( const AnimationCreation& creation ) {
-    AnimationHandle handle = animation_datas.size;
+    AnimationData& new_data = *data.obtain();
 
-    AnimationData new_data;
-
-    new_data.uv_offset = { creation.start_pixel.x / creation.texture_size.x, creation.start_pixel.y / creation.texture_size.y };
-    new_data.uv_size = { creation.frame_size.x / creation.texture_size.x, creation.frame_size.y / creation.texture_size.y };
+    new_data.uv_offset = { creation.offset[ 0 ] * 1.f / creation.texture_size[ 0 ], creation.offset[ 1 ] * 1.f / creation.texture_size[ 1 ] };
+    new_data.uv_size = { creation.frame_size[ 0 ] * 1.f / creation.texture_size[ 0 ], creation.frame_size[ 1 ] * 1.f / creation.texture_size[ 1 ] };
     new_data.num_frames = creation.num_frames;
     new_data.frames_columns = creation.columns;
     new_data.fps = creation.fps;
     new_data.is_looping = creation.looping;
     new_data.is_inverted = creation.invert;
 
-    animation_datas.push( new_data );
-
-    return handle;
+    return new_data.pool_index;
 }
 
 void AnimationSystem::destroy_animation( AnimationHandle handle ) {
 
-    // TODO: should use a ResourcePool!
+    data.release_resource( handle );
+}
+
+AnimationState* AnimationSystem::create_animation_state() {
+    return states.obtain();
+}
+
+void AnimationSystem::destroy_animation_state( AnimationState* state ) {
+    states.release( state );
 }
 
 
@@ -119,18 +126,21 @@ AnimationCreation& AnimationCreation::reset() {
     return *this;
 }
 
-AnimationCreation& AnimationCreation::set_texture_size( const vec2s& size ) {
-    texture_size = size;
+AnimationCreation& AnimationCreation::set_texture_size( u32 width, u32 height ) {
+    texture_size[ 0 ] = u16( width );
+    texture_size[ 1 ] = u16( height );
     return *this;
 }
 
-AnimationCreation& AnimationCreation::set_origin( const vec2s& origin ) {
-    start_pixel = origin;
+AnimationCreation& AnimationCreation::set_offset( u32 x, u32 y ) {
+    offset[ 0 ] = u16( x );
+    offset[ 1 ] = u16( y );
     return *this;
 }
 
-AnimationCreation& AnimationCreation::set_size( const vec2s& size ) {
-    frame_size = size;
+AnimationCreation& AnimationCreation::set_frame_size( u32 frame_width, u32 frame_height ) {
+    frame_size[ 0 ] = u16( frame_width );
+    frame_size[ 1 ] = u16( frame_height );
     return *this;
 }
 

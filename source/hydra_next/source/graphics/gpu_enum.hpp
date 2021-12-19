@@ -20,7 +20,7 @@ namespace Blend {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace Blend
 
@@ -38,7 +38,7 @@ namespace BlendOperation {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace BlendOperation
 
@@ -56,7 +56,7 @@ namespace ColorWriteEnabled {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace ColorWriteEnabled
 
@@ -74,7 +74,7 @@ namespace ComparisonFunction {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace ComparisonFunction
 
@@ -92,7 +92,7 @@ namespace CullMode {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace CullMode
 
@@ -110,7 +110,7 @@ namespace DepthWriteMask {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace DepthWriteMask
 
@@ -128,7 +128,7 @@ namespace FillMode {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace FillMode
 
@@ -146,7 +146,7 @@ namespace FrontClockwise {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace FrontClockwise
 
@@ -164,7 +164,7 @@ namespace StencilOperation {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace StencilOperation
 
@@ -178,7 +178,7 @@ namespace TextureFormat {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TextureFormat
 
@@ -196,7 +196,7 @@ namespace TopologyType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TopologyType
 
@@ -214,7 +214,7 @@ namespace BufferType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace BufferType
 
@@ -232,7 +232,7 @@ namespace ResourceUsageType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace ResourceUsageType
 
@@ -250,7 +250,7 @@ namespace IndexType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace IndexType
 
@@ -268,7 +268,7 @@ namespace TextureType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TextureType
 
@@ -286,7 +286,7 @@ namespace ShaderStage {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace ShaderStage
 
@@ -304,7 +304,7 @@ namespace TextureFilter {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TextureFilter
 
@@ -322,7 +322,7 @@ namespace TextureMipFilter {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TextureMipFilter
 
@@ -340,21 +340,21 @@ namespace TextureAddressMode {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace TextureAddressMode
 
 namespace VertexComponentFormat {
     enum Enum {
-        Float, Float2, Float3, Float4, Mat4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Uint, Count
+        Float, Float2, Float3, Float4, Mat4, Byte, Byte4N, UByte, UByte4N, Short2, Short2N, Short4, Short4N, Uint, Uint2, Uint4, Count
     };
 
     static const char* s_value_names[] = {
-        "Float", "Float2", "Float3", "Float4", "Mat4", "Byte", "Byte4N", "UByte", "UByte4N", "Short2", "Short2N", "Short4", "Short4N", "Uint", "Count"
+        "Float", "Float2", "Float3", "Float4", "Mat4", "Byte", "Byte4N", "UByte", "UByte4N", "Short2", "Short2N", "Short4", "Short4N", "Uint", "Uint2", "Uint4", "Count"
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace VertexComponentFormat
 
@@ -372,7 +372,7 @@ namespace VertexInputRate {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace VertexInputRate
 
@@ -390,7 +390,7 @@ namespace LogicOperation {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace LogicOperation
 
@@ -408,7 +408,7 @@ namespace QueueType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace QueueType
 
@@ -422,25 +422,25 @@ namespace CommandType {
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace CommandType
 
 namespace ResourceType {
     enum Enum {
-        Sampler, Texture, Image, ImageRW, Constants, StructuredBuffer, StructuredBufferRW, Count
+        Sampler, Texture, Image, BufferImage, Constants, StructuredBuffer, BufferImageRW, Count
     };
 
     enum Mask {
-        Sampler_mask = 1 << 0, Texture_mask = 1 << 1, Image_mask = 1 << 2, ImageRW_mask = 1 << 3, Constants_mask = 1 << 4, StructuredBuffer_mask = 1 << 5, StructuredBufferRW_mask = 1 << 6, Count_mask = 1 << 7
+        Sampler_mask = 1 << 0, Texture_mask = 1 << 1, Image_mask = 1 << 2, BufferImage_mask = 1 << 3, Constants_mask = 1 << 4, StructuredBuffer_mask = 1 << 5, BufferImageRW_mask = 1 << 6, Count_mask = 1 << 7
     };
 
     static const char* s_value_names[] = {
-        "Sampler", "Texture", "Image", "ImageRW", "Constants", "StructuredBuffer", "StructuredBufferRW", "Count"
+        "Sampler", "Texture", "Image", "BufferImage", "Constants", "StructuredBuffer", "BufferImageRW", "Count"
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 } // namespace ResourceType
 
@@ -450,24 +450,24 @@ enum DeviceExtensions {
     DeviceExtensions_DebugCallback                      = 1 << 0,
 };
 
-namespace TextureCreationFlags {
+namespace TextureFlags {
     enum Enum {
-        None, RenderTarget, ComputeOutput, Count
+        Default, RenderTarget, Compute, Count
     };
 
     enum Mask {
-        None_mask = 1 << 0, RenderTarget_mask = 1 << 1, ComputeOutput_mask = 1 << 2
+        Default_mask = 1 << 0, RenderTarget_mask = 1 << 1, Compute_mask = 1 << 2
     };
 
     static const char* s_value_names[] = {
-        "None", "RenderTarget", "ComputeOutput", "Count"
+        "Default", "RenderTarget", "Compute", "Count"
     };
 
     static const char* ToString( Enum e ) {
-        return s_value_names[(int)e];
+        return ((u32)e < Enum::Count ? s_value_names[(int)e] : "unsupported" );
     }
 
-} // namespace TextureCreationFlags
+} // namespace TextureFlags
 
 
 namespace PipelineStage {
@@ -510,6 +510,29 @@ namespace RenderPassOperation {
         DontCare, Load, Clear, Count
     }; // enum Enum
 } // namespace RenderPassOperation
+
+// TODO: taken from the Forge
+typedef enum ResourceState {
+    RESOURCE_STATE_UNDEFINED = 0,
+    RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER = 0x1,
+    RESOURCE_STATE_INDEX_BUFFER = 0x2,
+    RESOURCE_STATE_RENDER_TARGET = 0x4,
+    RESOURCE_STATE_UNORDERED_ACCESS = 0x8,
+    RESOURCE_STATE_DEPTH_WRITE = 0x10,
+    RESOURCE_STATE_DEPTH_READ = 0x20,
+    RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE = 0x40,
+    RESOURCE_STATE_PIXEL_SHADER_RESOURCE = 0x80,
+    RESOURCE_STATE_SHADER_RESOURCE = 0x40 | 0x80,
+    RESOURCE_STATE_STREAM_OUT = 0x100,
+    RESOURCE_STATE_INDIRECT_ARGUMENT = 0x200,
+    RESOURCE_STATE_COPY_DEST = 0x400,
+    RESOURCE_STATE_COPY_SOURCE = 0x800,
+    RESOURCE_STATE_GENERIC_READ = ( ( ( ( ( 0x1 | 0x2 ) | 0x40 ) | 0x80 ) | 0x200 ) | 0x800 ),
+    RESOURCE_STATE_PRESENT = 0x1000,
+    RESOURCE_STATE_COMMON = 0x2000,
+    RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE = 0x4000,
+    RESOURCE_STATE_SHADING_RATE_SOURCE = 0x8000,
+} ResourceState;
 
 // TODO: Error enum?
 

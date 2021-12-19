@@ -33,15 +33,19 @@ struct CommandBuffer {
     void                            set_scissor( u64 sort_key, const Rect2DInt* rect );
 
     void                            clear( u64 sort_key, f32 red, f32 green, f32 blue, f32 alpha );
-    void                            clear_depth_stencil( u64 sort_key, f32 depth, uint8_t stencil );
+    void                            clear_depth_stencil( u64 sort_key, f32 depth, u8 stencil );
 
     void                            draw( u64 sort_key, TopologyType::Enum topology, u32 first_vertex, u32 vertex_count, u32 first_instance, u32 instance_count );
     void                            draw_indexed( u64 sort_key, TopologyType::Enum topology, u32 index_count, u32 instance_count, u32 first_index, i32 vertex_offset, u32 first_instance );
     void                            draw_indirect( u64 sort_key, BufferHandle handle, u32 offset, u32 stride );
+    void                            draw_indexed_indirect( u64 sort_key, BufferHandle handle, u32 offset, u32 stride );
 
     void                            dispatch( u64 sort_key, u32 group_x, u32 group_y, u32 group_z );
+    void                            dispatch_indirect( u64 sort_key, BufferHandle handle, u32 offset );
 
     void                            barrier( const ExecutionBarrier& barrier );
+
+    void                            fill_buffer( BufferHandle buffer, u32 offset, u32 size, u32 data );
 
     void                            push_marker( const char* name );
     void                            pop_marker();

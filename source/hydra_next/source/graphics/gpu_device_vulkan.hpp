@@ -11,6 +11,8 @@
 #include "graphics/gpu_resources_vulkan.hpp"
 #include "graphics/command_buffer.hpp"
 
+#include "kernel/array.hpp"
+
 namespace hydra {
 namespace gfx {
 
@@ -56,7 +58,7 @@ struct GpuDeviceVulkan : public Device {
     void                            set_buffer_global_offset( BufferHandle buffer, u32 offset );
 
     // Resource list //////////////////////////////////////////////////////
-    void                            update_resource_list( const ResourceListUpdate& update );
+    void                            update_resource_list( ResourceListHandle resource_list );
     void                            update_resource_list_instant( const ResourceListUpdate& update );
 
     // Swapchain //////////////////////////////////////////////////////////
@@ -99,7 +101,7 @@ struct GpuDeviceVulkan : public Device {
     void                            set_present_mode( PresentMode::Enum mode );
 
     void                            fill_barrier( RenderPassHandle render_pass, ExecutionBarrier& out_barrier );
-    void                            resize_output_textures( RenderPassHandle render_pass, u16 width, u16 height );
+    void                            resize_output_textures( RenderPassHandle render_pass, u32 width, u32 height );
     void                            link_texture_sampler( TextureHandle texture, SamplerHandle sampler );
 
     void                            frame_counters_advance();
@@ -145,14 +147,10 @@ struct GpuDeviceVulkan : public Device {
     
     VmaAllocator                    vma_allocator;
 
-    ResourceUpdate                  resource_deletion_queue[ k_max_resource_deletions ];
-    u32                             num_deletion_queue              = 0;
-
-    ResourceListUpdate              resource_list_update_queue[ k_max_resource_deletions ];
-    u32                             num_update_queue                = 0;
-
-    ResourceUpdate                  texture_to_update_bindless[ k_max_resource_deletions ];
-    u32                             num_texture_updates             = 0;
+    // These are dynamic - so that workload can be handled correctly.
+    Array<ResourceUpdate>           resource_deletion_queue;
+    Array<ResourceListUpdate>       resource_list_update_queue;
+    Array<ResourceUpdate>           texture_to_update_bindless;
 
     f32                             gpu_timestamp_frequency;
     bool                            gpu_timestamp_reset             = true;

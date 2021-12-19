@@ -1,4 +1,4 @@
-// Hydra HFX v0.52
+// Hydra HFX v0.54
 
 #include "hydra_shaderfx.h"
 
@@ -371,7 +371,7 @@ void uniform_identifier( Parser* parser, const Token& token, CodeFragment& code_
                     Token name_token;
                     lexer_next_token( parser->lexer, name_token );
 
-                    CodeFragment::Resource resource = { hydra::gfx::ResourceType::ImageRW, name_token.text };
+                    CodeFragment::Resource resource = { hydra::gfx::ResourceType::Image, name_token.text };
                     code_fragment.resources.emplace_back( resource );
                 }
                 break;
@@ -505,12 +505,12 @@ void resource_binding_identifier( Parser* parser, const Token& token, ResourceBi
                 break;
             }
 
-            case 't':
+            case 'i':
             {
-                if ( lexer_expect_keyword( token.text, 9, "texture1D" ) ||
-                     lexer_expect_keyword( token.text, 9, "texture2D" ) ||
-                     lexer_expect_keyword( token.text, 9, "texture3D" ) ) {
-                    binding.type = hydra::gfx::ResourceType::Texture;
+                if ( lexer_expect_keyword( token.text, 7, "image1D" ) ||
+                     lexer_expect_keyword( token.text, 7, "image2D" ) ||
+                     lexer_expect_keyword( token.text, 7, "image3D" ) ) {
+                    binding.type = hydra::gfx::ResourceType::Image;
                     binding.start = u16_max;
                     binding.count = 1;
 
@@ -522,14 +522,19 @@ void resource_binding_identifier( Parser* parser, const Token& token, ResourceBi
 
                     return;
                 }
-                else if ( lexer_expect_keyword( token.text, 11, "texture1Drw" ) ||
-                          lexer_expect_keyword( token.text, 11, "texture2Drw" ) ||
-                          lexer_expect_keyword( token.text, 11, "texture3Drw" ) ) {
-                    binding.type = hydra::gfx::ResourceType::ImageRW;
+
+                break;
+            }
+
+            case 't':
+            {
+                if ( lexer_expect_keyword( token.text, 9, "texture1D" ) ||
+                     lexer_expect_keyword( token.text, 9, "texture2D" ) ||
+                     lexer_expect_keyword( token.text, 9, "texture3D" ) ) {
+                    binding.type = hydra::gfx::ResourceType::Texture;
                     binding.start = u16_max;
                     binding.count = 1;
 
-                    lexer_next_token( parser->lexer, other_token );
                     lexer_next_token( parser->lexer, other_token );
 
                     StringRef::copy_to( other_token.text, binding.name, 32 );
@@ -628,6 +633,12 @@ void vertex_attribute_identifier( Parser* parser, Token& token, hydra::gfx::Vert
                 }
                 else if ( lexer_expect_keyword( token.text, 7, "ubyte4n" ) ) {
                     attribute.format = hydra::gfx::VertexComponentFormat::UByte4N;
+                }
+                else if ( lexer_expect_keyword( token.text, 5, "uint4" ) ) {
+                    attribute.format = hydra::gfx::VertexComponentFormat::Uint4;
+                }
+                else if ( lexer_expect_keyword( token.text, 5, "uint2" ) ) {
+                    attribute.format = hydra::gfx::VertexComponentFormat::Uint2;
                 }
                 else if ( lexer_expect_keyword( token.text, 4, "uint" ) ) {
                     attribute.format = hydra::gfx::VertexComponentFormat::Uint;
@@ -1924,6 +1935,17 @@ static void append_reflection_data( nlohmann::json& parsed_json, const char* nam
             reflection_update_automatic_binding( out_bindings, binding, namespace_name, name_str.c_str(), hydra::gfx::ResourceType::StructuredBuffer );
         }
 
+        json images = parsed_json[ "images" ];
+        for ( u32 i = 0; i < images.size(); ++i ) {
+            json image = images[ i ];
+            u32 set = image.value( "set", 0 );
+            u32 binding = image.value( "binding", 0 );
+            image[ "name" ].get_to( name_str );
+            reflection_buffer->append_f( "\t\t\tstatic const uint32_t binding_im_%s = %u; // Set %u, binding %u\n", name_str.c_str(), binding, set, binding );
+
+            reflection_update_automatic_binding( out_bindings, binding, namespace_name, name_str.c_str(), hydra::gfx::ResourceType::Image );
+        }
+
         reflection_buffer->append_f( "\n\t\t} // namespace %s\n\n", namespace_name );
 
         written_types.shutdown();
@@ -2693,13 +2715,17 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
 
         // Handle automatic layout generation per pass
         const bool automatic_layout = is_resources_layout_automatic( code_generator->parser->shader, pass );
-        if ( automatic_layout ) {
-            memset( pass_bindings, 0, 32 * sizeof( hfx::ResourceBinding ) );
-        }
+        // Reset pass bindings
+        memset( pass_bindings, 0, 32 * sizeof( hfx::ResourceBinding ) );
 
         // For each shader stage
         for ( u32 s = 0; s < pass_shader_stages; ++s ) {
             const Pass::ShaderStage shader_stage = pass.shader_stages[ s ];
+
+            if ( shader_stage.code == nullptr ) {
+                hprint( "Error: shader code not found for pass %s\n", pass_blueprint.name );
+                continue;
+            }
 
             shader_code_buffer.clear();
             finalize_shader_code( input_path, code_generator, shader_stage, constants_buffer, filename_buffer, shader_code_buffer );
@@ -2769,6 +2795,9 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
             pass_blueprint.vertex_streams.size = 0;
         }
 
+        // Cache pass name
+        char* pass_name_c = filename_buffer.append_use( pass.name );
+
         // Create resource list to reflection map
         hydra::FlatHashMap<u64, u32> name_to_binding;
         name_to_binding.init( code_generator->parser->allocator, 16 );
@@ -2781,6 +2810,10 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
         }
 
         const u32 num_layouts = (u32)pass.resource_lists.size();
+
+        if ( num_layouts == 0 ) {
+            hprint( "Error in shader %s, pass %s: there are no layouts defined!\n", output_filename, pass_name_c );
+        }
         blob.allocate_and_set<ResourceLayoutBlueprint>( pass_blueprint.resource_layouts, num_layouts + automatic_layout ? 1 : 0 );
         for ( u32 l = 0; l < num_layouts; ++l ) {
             ResourceList* resource_list = (ResourceList*)pass.resource_lists[ l ];
@@ -2792,14 +2825,16 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
                 u16 binding_point = (u16)name_to_binding.get( hydra::hash_calculate( rb.name ) );
                 rb.start = binding_point;
 
+                if ( binding_point == u16_max ) {
+                    hprint( "Error finding binding point for resource %s, pass %s\n", rb.name, pass_name_c );
+                }
+
                 reflection_buffer.append_f( "\t\tstatic const uint32_t layout_%s = %u;\n", rb.name, r );
             }
 
             ResourceLayoutBlueprint& resource_layout_blueprint = pass_blueprint.resource_layouts[ l ];
             blob.allocate_and_set<ResourceBinding>( resource_layout_blueprint.bindings, num_resources, (void*)resource_list->resources.data() );
         }
-
-        char* pass_name_c = filename_buffer.append_use( pass.name );
 
         // Output Table to quickly setup resources
         if ( generate_reflection_data ) {
@@ -2822,10 +2857,16 @@ static void code_generator_generate_embedded_file_v2( CodeGenerator* code_genera
                             break;
                         }
 
+                        case hydra::gfx::ResourceType::Image:
                         case hydra::gfx::ResourceType::Texture:
                         {
                             reflection_buffer.append_f( "\t\t\tTable& set_%s( hydra::gfx::Texture* texture ) {\n", rb.name );
                             reflection_buffer.append_f( "\t\t\t\trlc->texture( texture->handle, layout_%s );\n\t\t\t\treturn *this;\n\t\t\t}\n", rb.name );
+                            break;
+                        }
+                        default:
+                        {
+                            hy_assertm( false, "Unsupported type %u\n", rb.type );
                             break;
                         }
                     }
@@ -3049,7 +3090,7 @@ void code_generator_generate_embedded_file( CodeGenerator* code_generator, const
                     const hfx::CodeFragment::Resource& resource = shader_stage.code->resources[p];
 
                     switch ( resource.type ) {
-                        case hydra::gfx::ResourceType::ImageRW:
+                        case hydra::gfx::ResourceType::Image:
                         case hydra::gfx::ResourceType::Texture:
                         case hydra::gfx::ResourceType::Constants:
                         {

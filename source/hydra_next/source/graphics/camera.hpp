@@ -28,6 +28,9 @@ struct Camera {
     // Project/unproject
     vec3s                       unproject( const vec3s& screen_coordinates );
 
+    // Unproject by inverting the y of the screen coordinate.
+    vec3s                       unproject_inverted_y( const vec3s& screen_coordinates );
+
     void                        get_projection_ortho_2d( mat4& out_matrix );
 
     static void                 yaw_pitch_from_direction( const vec3s& direction, f32 & yaw, f32& pitch );

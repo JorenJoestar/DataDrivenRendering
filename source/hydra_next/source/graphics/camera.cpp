@@ -126,6 +126,11 @@ vec3s Camera::unproject( const vec3s& screen_coordinates ) {
     return glms_unproject( screen_coordinates, view_projection, { 0, 0, viewport_width, viewport_height } );
 }
 
+vec3s Camera::unproject_inverted_y( const vec3s& screen_coordinates ) {
+    const vec3s screen_coordinates_y_inv{ screen_coordinates.x, viewport_height - screen_coordinates.y, screen_coordinates.z };
+    return unproject( screen_coordinates_y_inv );
+}
+
 void Camera::get_projection_ortho_2d( mat4& out_matrix ) {
     glm_ortho( 0, viewport_width * zoom, 0, viewport_height * zoom, -1.f, 1.f, out_matrix );
 }

@@ -1,6 +1,6 @@
 
 //
-// Hydra HFX v0.52
+// Hydra HFX v0.54
 //
 //      Source code     : https://www.github.com/jorenjoestar/
 //
@@ -9,6 +9,8 @@
 //
 // Revision history //////////////////////
 //
+//      0.54  (2021/12/03): + Added support for uint2 and uint4 as vertex formats.
+//      0.53  (2021/11/16): + BREAKING: changed 'textureXDRW' to 'imageXD' for resource layour declarations to better reflect the underlying data. + Added support for images.
 //      0.52  (2021/11/07): + Added custom ResourceBinding class to store data inside hfx file. ResourceLayout was losing it after creation because was using temporary data.
 //      0.51  (2021/11/02): + Empowered generated code by adding table helper to fill ResourceListCreation.
 //      0.50  (2021/10/27): + Added generated c++ folder as hfx_compile parameter to control generated file output.

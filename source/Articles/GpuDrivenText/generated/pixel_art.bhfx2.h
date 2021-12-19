@@ -1,11 +1,12 @@
 namespace pixel_art {
 
-	static hydra::gfx::ResourceListCreation tables[ 1 ];
+	static hydra::gfx::ResourceListCreation tables[ 2 ];
 
-	static const uint32_t		pass_fat_sprite = 0;
-	static const uint32_t		pass_count = 1;
+	static const uint32_t		pass_sprite_forward = 0;
+	static const uint32_t		pass_sky_color = 1;
+	static const uint32_t		pass_count = 2;
 
-	namespace fat_sprite {
+	namespace sprite_forward {
 		namespace vert {
 
 			struct gl_PerVertex {
@@ -79,6 +80,7 @@ namespace pixel_art {
 
 			static const uint32_t binding_cb_Local = 0; // Set 0, binding 0
 			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
+			static const uint32_t binding_tex_textures_3d = 10; // Set 1, binding 10
 
 		} // namespace frag
 
@@ -89,7 +91,7 @@ namespace pixel_art {
 
 		struct Table {
 			Table& reset() {
-				rlc = &tables[ pass_fat_sprite ];
+				rlc = &tables[ pass_sprite_forward ];
 				rlc->reset();
 				return *this;
 			}
@@ -116,7 +118,48 @@ namespace pixel_art {
 
 		static Table& table() { static Table s_table; return s_table; }
 
-	} // pass fat_sprite
+	} // pass sprite_forward
+
+	namespace sky_color {
+		namespace vert {
+
+			struct gl_PerVertex {
+				vec4					gl_Position;
+				float					gl_PointSize;
+				float					gl_ClipDistance;
+				float					gl_CullDistance;
+			};
+
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
+			static const uint32_t binding_tex_textures_3d = 10; // Set 1, binding 10
+
+		} // namespace vert
+
+		namespace frag {
+
+			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
+			static const uint32_t binding_tex_textures_3d = 10; // Set 1, binding 10
+			static const uint32_t binding_tex_dither_texture = 0; // Set 0, binding 0
+
+		} // namespace frag
+
+
+		struct Table {
+			Table& reset() {
+				rlc = &tables[ pass_sky_color ];
+				rlc->reset();
+				return *this;
+			}
+
+			hydra::gfx::ResourceListCreation* rlc;
+		}; // struct Table
+
+
+		static Table& table() { static Table s_table; return s_table; }
+
+		static const uint32_t layout_dither_texture = 0;
+		static const uint32_t layout_textures_3d = 1;
+	} // pass sky_color
 
 
 } // shader pixel_art

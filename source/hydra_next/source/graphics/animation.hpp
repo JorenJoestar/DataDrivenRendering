@@ -1,9 +1,7 @@
 #pragma once
 
-#pragma once
-
 //
-//  Hydra Animation - v0.07
+//  Hydra Animation - v0.08
 //
 //  Animation Systems
 //
@@ -14,6 +12,7 @@
 //
 // Revision history //////////////////////
 //
+//      0.08 (2021/12/18): + Added AnimationStates as pooled data. + Changed AnimationCreation to use u16.
 //      0.07 (2021/06/23): + Changed animation state to use offset,size insted of uv0,uv1.
 //      0.06 (2021/06/21): + Added inversion as new looping mode.
 //      0.05 (2021/06/16): + Updated to hydra next.
@@ -23,7 +22,7 @@
 //      0.01 (2021/01/08): + Initial file writing.
 
 #include "kernel/primitive_types.hpp"
-#include "kernel/array.hpp"
+#include "kernel/data_structures.hpp"
 
 #include "cglm/types-struct.h"
 
@@ -35,9 +34,9 @@ typedef u32     AnimationHandle;
 //
 struct AnimationCreation {
 
-    vec2s                   texture_size;
-    vec2s                   start_pixel;
-    vec2s                   frame_size;
+    u16                     texture_size[2];
+    u16                     offset[2];
+    u16                     frame_size[2];
 
     u16                     num_frames;
     u16                     columns;
@@ -47,9 +46,9 @@ struct AnimationCreation {
     bool                    invert;
 
     AnimationCreation&      reset();
-    AnimationCreation&      set_texture_size( const vec2s& size );
-    AnimationCreation&      set_origin( const vec2s& origin );
-    AnimationCreation&      set_size( const vec2s& size );
+    AnimationCreation&      set_texture_size( u32 width, u32 height );
+    AnimationCreation&      set_offset( u32 x, u32 y );
+    AnimationCreation&      set_frame_size( u32 frame_width, u32 frame_height );
     AnimationCreation&      set_animation( u32 num_frames, u32 columns, u32 fps, bool looping, bool invert );
 
 }; // struct AnimationCreation
@@ -60,6 +59,8 @@ struct AnimationData {
 
     vec2s       uv_offset;
     vec2s       uv_size;
+
+    u32         pool_index;
 
     // Total number of frames
     u16         num_frames;
@@ -84,7 +85,11 @@ struct AnimationState {
 
     vec2s       uv_offset;
     vec2s       uv_size;
-}; // struct Animation
+
+    u32         pool_index;
+
+    cstring     name;
+}; // struct AnimationState
 
 
 //
@@ -104,7 +109,11 @@ struct AnimationSystem {
     AnimationHandle         create_animation( const AnimationCreation& creation );
     void                    destroy_animation( AnimationHandle handle );
 
-    Array<AnimationData>    animation_datas;
+    AnimationState*         create_animation_state();
+    void                    destroy_animation_state( AnimationState* state );
+
+    ResourcePoolTyped<AnimationData>  data;
+    ResourcePoolTyped<AnimationState> states;
     Allocator*              allocator;
 
 }; // struct AnimationSystem

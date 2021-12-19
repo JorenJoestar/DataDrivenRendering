@@ -26,10 +26,11 @@ struct SpriteGPUData {
     vec2s                           uv_offset;
 
     vec2s                           size;
-    f32                             screen_space_flag;      // True if position is screen space.
-    f32                             lighting_flag;          // True if lighting is on.
+    u32                             flag0;
+    u32                             flag1;
 
-    u32                             albedo_id;              // Global albedo id
+    void                            set_albedo_id( u32 albedo_id )  { flag1 = albedo_id; }
+    u32                             get_albedo_it() const           { return flag1; }
 
 }; // struct SpriteGPUData
 
@@ -47,8 +48,8 @@ struct DrawBatch {
 //
 struct SpriteBatch {
 
-    void                            init( hydra::gfx::Renderer& renderer, hydra::Allocator* allocator );
-    void                            shutdown( hydra::gfx::Renderer& renderer );
+    void                            init( hydra::gfx::Renderer* renderer, hydra::Allocator* allocator );
+    void                            shutdown( hydra::gfx::Renderer* renderer );
 
     void                            begin( hydra::gfx::Renderer& renderer, hydra::gfx::Camera& camera );
     void                            end( hydra::gfx::Renderer& renderer );

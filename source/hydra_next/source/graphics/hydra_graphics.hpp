@@ -1,7 +1,7 @@
 #pragma once
 
 //
-//  Hydra Graphics - v0.48
+//  Hydra Graphics - v0.54
 //  3D API wrapper around Vulkan/Direct3D12/OpenGL.
 //  Mostly based on the amazing Sokol library (https://github.com/floooh/sokol), but with a different target (wrapping Vulkan/Direct3D12).
 //

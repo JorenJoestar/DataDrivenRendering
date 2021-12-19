@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// Hydra Lib - v0.33
+// Hydra Lib - v0.36
 //
 // Header to track different core libraries within Hydra framework.
 //
@@ -18,6 +18,9 @@
 //
 // Revision history //////////////////////
 //
+//      0.36 (2021/12/14): + Moved ColorUint class to kernel layer.
+//      0.35 (2021/12/09): + Added back/front and push_use methods to Array class.
+//      0.34 (2021/12/02): + Added resource and resource manager classes.
 //      0.33 (2021/11/10): + Added index/string interface to StringBuffer.
 //                         + Fixed LinearAllocator as grow-only/clear-all allocator. It was the same as StackAllocator before.
 //      0.32 (2021/11/05): + Added serialize_memory_block to BlobSerializer to read/write blocks of memory easily.

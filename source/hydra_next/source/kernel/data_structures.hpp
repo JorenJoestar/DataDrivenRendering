@@ -40,8 +40,8 @@ namespace hydra {
         T*                              obtain();
         void                            release( T* resource );
 
-        T*                              get( u32 index);
-        const T*                        get( u32 index) const;
+        T*                              get( u32 index );
+        const T*                        get( u32 index ) const;
 
     }; // struct ResourcePoolTyped
 
@@ -52,6 +52,13 @@ namespace hydra {
 
     template<typename T>
     inline void ResourcePoolTyped<T>::shutdown() {
+        if ( free_indices_head != 0 ) {
+            hprint( "Resource pool has unfreed resources.\n" );
+
+            for ( u32 i = 0; i < free_indices_head; ++i ) {
+                hprint( "\tResource %u, %s\n", free_indices[ i ], get( free_indices[ i ] )->name );
+            }
+        }
         ResourcePool::shutdown();
     }
 

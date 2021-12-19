@@ -63,14 +63,14 @@ void GameApplication::create( const hydra::ApplicationConfiguration& configurati
     window->register_os_messages_callback( input_os_messages_callback, input );
 
     // App specific create ////////////////////////////////////////////////
-    gfx = service_manager->get<hydra::gfx::Renderer>();
+    renderer = service_manager->get<hydra::gfx::Renderer>();
 
     hydra::gfx::RendererCreation rc{ gpu, &hydra::MemoryService::instance()->system_allocator };
-    gfx->init( rc );
+    renderer->init( rc );
 
     // imgui backend
     imgui = service_manager->get<hydra::ImGuiService>();
-    imgui->init( gfx );
+    imgui->init( renderer );
 
     hprint( "GameApplication created successfully!\n" );
 }
@@ -85,7 +85,7 @@ void GameApplication::destroy() {
     // Shutdown services
     imgui->shutdown();
     input->shutdown();
-    gfx->shutdown();
+    renderer->shutdown();
     window->shutdown();
 
     time_service_shutdown();
@@ -99,27 +99,11 @@ bool GameApplication::main_loop() {
 
     // Fix your timestep
     accumulator = current_time = 0.0;
+    begin_frame_tick = hydra::time_now();
 
     // Main loop
     while ( !window->requested_exit ) {
-        // New frame
-        if ( !window->minimized ) {
-            gfx->begin_frame();
-        }
-        input->new_frame();
-
-        window->handle_os_messages();
-
-        if ( window->resized ) {
-            gfx->resize_swapchain( window->width, window->height );
-            on_resize( window->width, window->height );
-            window->resized = false;
-        }
-        // This MUST be AFTER os messages!
-        imgui->new_frame( window->platform_handle );
-
-        // TODO: frametime
-        f32 delta_time = ImGui::GetIO().DeltaTime;
+        handle_begin_frame();
 
         //hprint( "Dt %f\n", delta_time );
         delta_time = glm_clamp( delta_time, 0.0f, 0.25f );
@@ -141,20 +125,20 @@ bool GameApplication::main_loop() {
             // Draw debug UIs
             hydra::MemoryService::instance()->imgui_draw();
 
-            hydra::gfx::CommandBuffer* gpu_commands = gfx->get_command_buffer( hydra::gfx::QueueType::Graphics, true );
+            hydra::gfx::CommandBuffer* gpu_commands = renderer->get_command_buffer( hydra::gfx::QueueType::Graphics, true );
             gpu_commands->push_marker( "Frame" );
 
             const f32 interpolation_factor = glm_clamp( (f32)(accumulator / step), 0.0f, 1.0f );
             render( interpolation_factor );
 
-            imgui->render( gfx, *gpu_commands );
+            imgui->render( renderer, *gpu_commands );
 
             gpu_commands->pop_marker();
 
             // Send commands to GPU
-            gfx->queue_command_buffer( gpu_commands );
+            renderer->queue_command_buffer( gpu_commands );
 
-            gfx->end_frame();
+            renderer->end_frame();
         }
         else {
             ImGui::Render();
@@ -177,6 +161,30 @@ void GameApplication::variable_update( f32 delta ) {
 
 void GameApplication::render( f32 interpolation ) {
     
+}
+
+void GameApplication::handle_begin_frame() {
+    // New frame
+    if ( !window->minimized ) {
+        renderer->begin_frame();
+    }
+    input->new_frame();
+
+    window->handle_os_messages();
+
+    // Handle resize
+    if ( window->resized ) {
+        renderer->resize_swapchain( window->width, window->height );
+        on_resize( window->width, window->height );
+        window->resized = false;
+    }
+    // This MUST be AFTER os messages!
+    imgui->new_frame( window->platform_handle );
+
+    // Calculate delta time
+    i64 current_tick = hydra::time_now();
+    delta_time = (f32)hydra::time_delta_seconds( begin_frame_tick, current_tick );
+    begin_frame_tick = current_tick;
 }
 
 void GameApplication::on_resize( u32 new_width, u32 new_height ) {
