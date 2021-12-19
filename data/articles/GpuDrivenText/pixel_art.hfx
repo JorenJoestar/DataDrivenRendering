@@ -50,8 +50,7 @@ shader pixel_art {
             mat4                    projection_matrix_2d;
         };
 
-        layout (std140, binding=0)
-        uniform Local{
+        layout (std140, set = 0, binding = 0) uniform Local {
     		LocalConstants  locals;
     	};
 
@@ -137,10 +136,6 @@ shader pixel_art {
         layout (location = 0) in vec4 uv_alpha;
         layout (location = 1) flat in uint albedo_id;
 
-#if !defined(HYDRA_BINDLESS)
-        layout (binding = 1) uniform sampler2D albedo;
-#endif // !HYDRA_BINDLESS
-
         layout (location = 0) out vec4 out_color;
 
         vec2 uv_nearest( vec2 uv, ivec2 texture_size ) {
@@ -189,8 +184,6 @@ shader pixel_art {
         layout (location = 1) flat in uint texture_id;
 
         layout (location = 0) out vec4 out_color;
-
-        layout (binding = 0) uniform sampler2D dither_texture;
 
         vec2 nearest_filter( vec2 uv, ivec2 texture_size ) {
             vec2 pixel = uv * texture_size;

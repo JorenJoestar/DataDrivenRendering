@@ -30,7 +30,7 @@ struct SpriteGPUData {
     u32                             flag1;
 
     void                            set_albedo_id( u32 albedo_id )  { flag1 = albedo_id; }
-    u32                             get_albedo_it() const           { return flag1; }
+    u32                             get_albedo_id() const           { return flag1; }
 
 }; // struct SpriteGPUData
 

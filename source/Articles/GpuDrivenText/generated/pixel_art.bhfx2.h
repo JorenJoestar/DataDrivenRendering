@@ -139,7 +139,6 @@ namespace pixel_art {
 
 			static const uint32_t binding_tex_textures = 10; // Set 1, binding 10
 			static const uint32_t binding_tex_textures_3d = 10; // Set 1, binding 10
-			static const uint32_t binding_tex_dither_texture = 0; // Set 0, binding 0
 
 		} // namespace frag
 
@@ -157,8 +156,7 @@ namespace pixel_art {
 
 		static Table& table() { static Table s_table; return s_table; }
 
-		static const uint32_t layout_dither_texture = 0;
-		static const uint32_t layout_textures_3d = 1;
+		static const uint32_t layout_textures_3d = 0;
 	} // pass sky_color
 
 

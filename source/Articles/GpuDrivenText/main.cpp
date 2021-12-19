@@ -443,7 +443,7 @@ void hg04::load_sprites() {
 
     // TODO: this is an API issue. In bindless
     pixel_art::sprite_forward::table().reset().set_Local( pixel_art_local_constants_cb )
-        .set_albedo( dither_texture_4x4 ).set_DebugGpuFontBuffer( debug_gpu_font_ub )
+        .set_DebugGpuFontBuffer( debug_gpu_font_ub )
         .set_DebugGpuFontEntries( debug_gpu_font_entries_ub );
     pixel_art::sky_color::table().reset();
 
