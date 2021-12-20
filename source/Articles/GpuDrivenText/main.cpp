@@ -284,9 +284,11 @@ bool hg04::main_loop() {
         
         // IMGUI //////////////////////////////////////////////////////////
         static bool s_use_fullscreen_gpu_font = false;
+        static bool s_disable_non_uniform_ext = false;
         if ( ImGui::Begin( "HG04" ) ) {
             ImGui::Checkbox( "Use Fullscreen GPU Font(slow)", &s_use_fullscreen_gpu_font );
             ImGui::Checkbox( "Pause animation", &pause_animation );
+            ImGui::Checkbox( "Disable non uniform EXT", &s_disable_non_uniform_ext );
             if ( ImGui::Button( "Reload shader" ) ) {
 
                 // Destroy resources
@@ -323,6 +325,10 @@ bool hg04::main_loop() {
         if ( constants ) {
             memcpy( constants->view_projection_matrix, main_camera.view_projection.raw, sizeof( mat4s ) );
             main_camera.get_projection_ortho_2d( constants->projection_matrix_2d );
+
+            constants->screen_width = this->renderer->width;
+            constants->screen_height = this->renderer->height;
+            constants->disable_non_uniform_ext = s_disable_non_uniform_ext ? 1 : 0;
 
             renderer->unmap_buffer( pixel_art_local_constants_cb );
         }

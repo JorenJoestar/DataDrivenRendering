@@ -19,6 +19,10 @@ namespace pixel_art {
 			struct LocalConstants {
 				mat4					view_projection_matrix;
 				mat4					projection_matrix_2d;
+				uint					screen_width;
+				uint					screen_height;
+				uint					disable_non_uniform_ext;
+				uint					pad30;
 			};
 
 			struct Local {
@@ -72,6 +76,10 @@ namespace pixel_art {
 			struct LocalConstants {
 				mat4					view_projection_matrix;
 				mat4					projection_matrix_2d;
+				uint					screen_width;
+				uint					screen_height;
+				uint					disable_non_uniform_ext;
+				uint					pad30;
 			};
 
 			struct Local {

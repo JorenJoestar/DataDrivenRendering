@@ -48,6 +48,11 @@ shader pixel_art {
 		struct LocalConstants {
             mat4                    view_projection_matrix;
             mat4                    projection_matrix_2d;
+
+            uint                    screen_width;
+            uint                    screen_height;
+            uint                    disable_non_uniform_ext;
+            uint                    pad30;
         };
 
         layout (std140, set = 0, binding = 0) uniform Local {
@@ -99,8 +104,8 @@ shader pixel_art {
                 uint data_index = atomicAdd(current_data_index, 16);
 
                 // Output using the actual clipspace position of the vertex.
-                entries[entry_index].x = (gl_Position.x * .5 + .5) * 1600;
-                entries[entry_index].y = (gl_Position.y * .5 + .5) * 1000 - STRHEIGHT(1);//STRHEIGHT(gl_InstanceIndex) + 100;
+                entries[entry_index].x = (gl_Position.x * .5 + .5) * locals.screen_width;
+                entries[entry_index].y = (gl_Position.y * .5 + .5) * locals.screen_height - STRHEIGHT(1);
                 entries[entry_index].offset = data_index;
                 entries[entry_index].count = 16;
 
@@ -158,10 +163,20 @@ shader pixel_art {
 
 		void main() {
 
-            ivec2 texture_size = textureSize(textures[nonuniformEXT(albedo_id)], 0);
-            vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
+            vec4 color = vec4(0,0,0,1);
 
-            vec4 color = texture( textures[nonuniformEXT(albedo_id)], final_uv.xy );
+            if ( locals.disable_non_uniform_ext == 1 ) {
+                ivec2 texture_size = textureSize(textures[albedo_id], 0);
+                vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
+
+                color = texture( textures[albedo_id], final_uv.xy );
+            }
+            else {
+                ivec2 texture_size = textureSize(textures[nonuniformEXT(albedo_id)], 0);
+                vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
+
+                color = texture( textures[nonuniformEXT(albedo_id)], final_uv.xy );
+            }
 
             if (color.a < 0.01)
                 discard;
