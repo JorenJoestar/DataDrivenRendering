@@ -158,10 +158,10 @@ shader pixel_art {
 
 		void main() {
 
-            ivec2 texture_size = textureSize(textures[albedo_id], 0);
+            ivec2 texture_size = textureSize(textures[nonuniformEXT(albedo_id)], 0);
             vec2 final_uv = uv_nearest(uv_alpha.xy, texture_size);
 
-            vec4 color = texture( textures[albedo_id], final_uv.xy );
+            vec4 color = texture( textures[nonuniformEXT(albedo_id)], final_uv.xy );
 
             if (color.a < 0.01)
                 discard;
